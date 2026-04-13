@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
 SRC_DIR="../data/fmriprep"
+if [[ ! -d $SRC_DIR ]]; then
+	mkdir -p $SRC_DIR
+	cp -r "/home/fmri2404/chiaoen/SrttNewV2/Nifti/derivatives/fMRIPrep/sub-*" $SRC_DIR
+fi
+
 DST_DIR="../data/fmriprep_dropped"
 if [[ ! -d $DST_DIR ]]; then mkdir -p $DST_DIR; fi
 
