@@ -1,0 +1,99 @@
+# Denoising Pipeline Optimization Report
+# Generated: 2026-04-16 20:21:24
+# Project:   /home/aclexp/pinwei/Joanne_SRT_fMRI/conn_out/optimize_denoise.mat
+# Subjects:  20  |  Runs: 8
+
+## Best Parameter Combination
+
+  Parameter         Value
+  ----------------  ----------
+  POLY_ORD          3
+  BP_HZ             [0.008, 0.09]
+  SIMULT            1
+  MOT24             0
+  N_ACOMP           15
+  N_AROMA           Inf
+
+  Validity          0.8035
+  Quality           0.8987
+  Sensitivity       0.9875
+  Mean_QC           0.8966
+
+## Score Distributions (main-effect summary)
+
+For each parameter, the mean QC score across all tested
+combinations that used that level (marginal average).
+
+### POLY_ORD
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  1             0.8190      0.6553      0.8380      0.9968      48
+  2             0.8177      0.6549      0.8420      0.9941      48
+  3             0.8286      0.6893      0.8533      0.9730      64
+
+### BP_HZ
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  [0.008 0.09]  0.8116      0.6750      0.8449      0.9728      88
+  [0.008 Inf]   0.8357      0.6612      0.8459      1.0000      72
+
+### SIMULT
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  1             0.8130      0.6857      0.8383      0.9728      88
+  0             0.8340      0.6481      0.8539      1.0000      72
+
+### MOT24
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  1             0.8257      0.6641      0.8597      0.9906      72
+  0             0.8198      0.6726      0.8336      0.9833      88
+
+### N_ACOMP
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  5             0.8165      0.5604      0.8908      0.9982      50
+  10            0.8783      0.7735      0.8616      0.9998      4
+  15            0.8870      0.7966      0.8683      0.9962      4
+  20            0.8561      0.7419      0.8521      0.9817      50
+  30            0.7857      0.8131      0.8629      0.5169      4
+  50            0.7866      0.6741      0.7862      1.0000      48
+
+### N_AROMA
+  Level         Mean_QC     Validity    Quality     Sensitiv.   n
+  0             0.8174      0.6606      0.8320      0.9913      75
+  5             0.8078      0.7497      0.8495      0.8243      5
+  10            0.8568      0.7563      0.8582      0.9865      5
+  Inf           0.8262      0.6657      0.8575      0.9939      75
+
+## Recommendation
+
+Use the parameter combination listed under "Best Parameter
+Combination" above for this dataset and task design.
+
+Specifically:
+  - Polynomial detrending order 3
+  - Bandpass filter [0.008, 0.09] Hz
+  - simultaneous regression + bandpass filtering (regbp=2)
+  - 12-parameter motion model (6 params + derivatives)
+  - 15 aCompCor noise components
+  - ICA-AROMA with all components
+
+To apply, set these values in run_conn_preproc.m (or a copy)
+and re-run the full pipeline including first-level analysis.
+
+## Caveats
+
+- 0 of 160 combinations failed (0.0%).
+- QC scores were recomputed on CONN's sample-voxel network
+  (~500-2000 grey-matter voxels), not the full brain volume.
+  This is standard CONN behaviour for QA plots and is
+  representative of whole-brain FC, but not identical.
+- The search used a two-stage grid: Stage 1 tested 144 coarse
+  combinations; Stage 2 tested 16 fine combinations around
+  the Stage 1 winner.  Interactions between the discrete
+  parameters (POLY, BP, SIMULT, MOT24) and the continuous
+  parameters (N_ACOMP, N_AROMA) are only partially captured.
+- Mean_QC is the simple arithmetic mean of Validity, Quality,
+  and Sensitivity.  All three are on [0, 1].  If one score
+  matters more for your analysis, consider weighting or
+  selecting by that score alone.
+- The DataSensitivity score depends on the number of valid
+  subjects remaining after outlier exclusion; aggressive
+  denoising may raise Validity/Quality but lower Sensitivity
+  by reducing effective DOF.

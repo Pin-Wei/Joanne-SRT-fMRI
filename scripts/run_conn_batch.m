@@ -3,9 +3,11 @@ clear; clc; close all;
 %% Configuration
 
 rootDir = '/media/data3/Joanne_SRT_pw/'; 
+% rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
+
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', 'v1.8_no_param.mat');
-% batchFile = fullfile(rootDir, 'conn_out', 'v1_with_param.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'v2_no_param.mat');
+QCFile = fullfile(rootDir, 'conn_out', 'v2_no_param_qc.csv');
 
 SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
 N_SUBJS = length(SID_LIST);
@@ -15,12 +17,12 @@ TR = 2.0; % repetition time (seconds)
 SPACE = 'MNI152NLin2009cAsym';
 
 FWHM = 6; % smoothing fwhm (mm)
-POLY_ORD = 1; % polynomial detrending order
-BP_HZ = [0.008 Inf]; % band-pass filter (Hz)
-SIMULT = true; % false; 
-MOT24 = true; % false; 
-N_ACOMP = 5;
-N_AROMA = Inf; % 5;
+POLY_ORD = 3; % polynomial detrending order
+BP_HZ = [0.008 0.09]; % band-pass filter (Hz)
+SIMULT = true;  
+MOT24 = false; 
+N_ACOMP = 15;
+N_AROMA = Inf; 
 
 % COND_NAMES = {'random', 'structured', 'switch', 'incorrect'};
 COND_NAMES = {'random', 'str_r12', 'str_r34', 'str_r56', 'str_r78', 'swi_r34', 'swi_r56', 'incorrect'};
@@ -39,10 +41,10 @@ CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)];
     % any covariate name, or 'Effect of *' where * represents any condition name.
 
 ROI_NAMES = {'atlas', 'networks'}; 
-ROI_FILES = { ...
-    '/home/aclexp/mytools/matlab/conn/rois/atlas.nii', ...
-    '/home/aclexp/mytools/matlab/conn/rois/networks.nii' ...
-};
+ROI_FILES = {'/home/aclexp/mytools/matlab/conn/rois/atlas.nii', ...
+             '/home/aclexp/mytools/matlab/conn/rois/networks.nii'};
+% ROI_FILES = {'/home/aclexp/Software/conn/rois/atlas.nii', ...
+%              '/home/aclexp/Software/conn/rois/networks.nii'}; 
 
 % ROI_NAMES = [ROI_NAMES, {'fs'}]; 
 % ROI_FILES = [ROI_FILES, {'/media/data3/Joanne_SRT_pw/data/meta/FS.afni_atlas.nii.gz'}]; 
@@ -207,6 +209,20 @@ batch.Denoising.overwrite = 'No';
 %% Finally
 
 conn_batch(batch)
+
+%% For Quality Control
+
+dataValidityScore = conn_qascores('DataValidity', [], []);
+dataQualityScore = conn_qascores('DataQuality', [], [], L2_COVARS, {});
+sensitivityVars = {'QC_ProportionValidScans','QC_MeanMotion', ...
+                   'QC_MeanGSchange','QC_NORM_struct', ...
+                   'QC_DOF','QC_PeakFC','QC_StdFC'};
+dataSensitivityScore = conn_qascores('DataSensitivity', [], [], sensitivityVars, 'extreme');
+QCScoreTable = array2table( ...
+    [dataValidityScore, dataQualityScore, dataSensitivityScore], ...
+    'VariableNames', ['Validity', 'Quality', 'Sensitivity'] ...
+);
+writetable(QCScoreTable, QCFile);
 
 %% For the testing run
 
