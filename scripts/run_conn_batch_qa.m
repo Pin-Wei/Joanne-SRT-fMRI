@@ -1,10 +1,27 @@
 clear; clc; close all;
 
-rootDir   = '/media/data3/Joanne_SRT_pw/'; 
-% batchFile = fullfile(rootDir, 'conn_out', 'v1_no_param.mat');
+rootDir = '/media/data3/Joanne_SRT_pw/'; 
+% rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
+
+batchFile = fullfile(rootDir, 'conn_out', 'v2_no_param.mat');
+QCFile = fullfile(rootDir, 'conn_out', 'v2_no_param_qc.csv');
 
 %% Quality Assurance
 % https://web.conn-toolbox.org/fmri-methods/denoising-pipeline#h.p_BaXJei3yiEQh
+
+global CONN_x;
+
+dataValidityScore = conn_qascores('DataValidity', [], []);
+dataQualityScore = conn_qascores('DataQuality', [], [], L2_COVARS, {});
+sensitivityVars = {'QC_ProportionValidScans','QC_MeanMotion', ...
+                   'QC_MeanGSchange','QC_NORM_struct', ...
+                   'QC_DOF','QC_PeakFC','QC_StdFC'};
+dataSensitivityScore = conn_qascores('DataSensitivity', [], [], sensitivityVars, 'extreme');
+QCScoreTable = array2table( ...
+    [dataValidityScore, dataQualityScore, dataSensitivityScore], ...
+    'VariableNames', ['Validity', 'Quality', 'Sensitivity'] ...
+);
+writetable(QCScoreTable, QCFile);
 
 conn_batch( ...
     'filename', batchFile, ...

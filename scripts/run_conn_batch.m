@@ -2,12 +2,20 @@ clear; clc; close all;
 
 %% Configuration
 
-rootDir = '/media/data3/Joanne_SRT_pw/'; 
-% rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
+IP = 23; % 37
+
+if IP == 37
+    rootDir = '/media/data3/Joanne_SRT_pw/';
+    connDir = '/home/aclexp/mytools/matlab/conn';
+elseif IP == 23
+    rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/';
+    connDir = '/home/aclexp/Software/conn';
+else 
+    error('Root directory for this IP address has not yet been defined.');
+end
 
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', 'v2_no_param.mat');
-QCFile = fullfile(rootDir, 'conn_out', 'v2_no_param_qc.csv');
+batchFile = fullfile(rootDir, 'conn_out', 'v4_no_param.mat');
 
 SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
 N_SUBJS = length(SID_LIST);
@@ -19,10 +27,10 @@ SPACE = 'MNI152NLin2009cAsym';
 FWHM = 6; % smoothing fwhm (mm)
 POLY_ORD = 3; % polynomial detrending order
 BP_HZ = [0.008 0.09]; % band-pass filter (Hz)
-SIMULT = true;  
-MOT24 = false; 
-N_ACOMP = 15;
-N_AROMA = Inf; 
+SIMULT = false;  
+MOT24 = true; 
+N_ACOMP = 20;
+N_AROMA = 0; 
 
 % COND_NAMES = {'random', 'structured', 'switch', 'incorrect'};
 COND_NAMES = {'random', 'str_r12', 'str_r34', 'str_r56', 'str_r78', 'swi_r34', 'swi_r56', 'incorrect'};
@@ -34,20 +42,15 @@ N_COVARS = numel(COVAR_NAMES);
 
 L2_COVARS = {'QC_MeanMotion', 'QC_InvalidScans'};
 
-CONFOUND_NAMES = {'realignment', 'scrubbing', 'aCompCor', 'aroma'};
-% CONFOUND_NAMES = [{'White Matter', 'CSF'}, CONFOUND_NAMES];
+CONFOUND_NAMES = {'realignment', 'scrubbing'};
+if N_ACOMP > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aCompCor'}]; end
+if N_AROMA > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aroma'}]; end
 CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)];
     % can be 'Grey Matter', 'White Matter', 'CSF', any ROI name, 
     % any covariate name, or 'Effect of *' where * represents any condition name.
 
 ROI_NAMES = {'atlas', 'networks'}; 
-ROI_FILES = {'/home/aclexp/mytools/matlab/conn/rois/atlas.nii', ...
-             '/home/aclexp/mytools/matlab/conn/rois/networks.nii'};
-% ROI_FILES = {'/home/aclexp/Software/conn/rois/atlas.nii', ...
-%              '/home/aclexp/Software/conn/rois/networks.nii'}; 
-
-% ROI_NAMES = [ROI_NAMES, {'fs'}]; 
-% ROI_FILES = [ROI_FILES, {'/media/data3/Joanne_SRT_pw/data/meta/FS.afni_atlas.nii.gz'}]; 
+ROI_FILES = {fullfile(connDir, 'rois', 'atlas.nii'), fullfile(connDir, 'rois', 'networks.nii')}; 
 
 %% Prepares batch structure
 
@@ -209,25 +212,4 @@ batch.Denoising.overwrite = 'No';
 %% Finally
 
 conn_batch(batch)
-
-%% For Quality Control
-
-dataValidityScore = conn_qascores('DataValidity', [], []);
-dataQualityScore = conn_qascores('DataQuality', [], [], L2_COVARS, {});
-sensitivityVars = {'QC_ProportionValidScans','QC_MeanMotion', ...
-                   'QC_MeanGSchange','QC_NORM_struct', ...
-                   'QC_DOF','QC_PeakFC','QC_StdFC'};
-dataSensitivityScore = conn_qascores('DataSensitivity', [], [], sensitivityVars, 'extreme');
-QCScoreTable = array2table( ...
-    [dataValidityScore, dataQualityScore, dataSensitivityScore], ...
-    'VariableNames', ['Validity', 'Quality', 'Sensitivity'] ...
-);
-writetable(QCScoreTable, QCFile);
-
-%% For the testing run
-
-% batchFile = fullfile(rootDir, 'derivatives', 'CONN', 'mini_no_param.mat');
-% SID_LIST = [1, 2];
-% N_RUNS = 2; 
-% COND_NAMES = {'random', 'structured', 'incorrect'};
 
