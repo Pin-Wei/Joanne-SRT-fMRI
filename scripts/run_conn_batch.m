@@ -2,7 +2,7 @@ clear; clc; close all;
 
 %% Configuration
 
-IP = 23; % 37
+IP = 37; % 23
 
 if IP == 37
     rootDir = '/media/data3/Joanne_SRT_pw/';
@@ -15,7 +15,7 @@ else
 end
 
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', 'v4_no_param.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'v0_no_param.mat');
 
 SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
 N_SUBJS = length(SID_LIST);
@@ -27,10 +27,10 @@ SPACE = 'MNI152NLin2009cAsym';
 FWHM = 6; % smoothing fwhm (mm)
 POLY_ORD = 3; % polynomial detrending order
 BP_HZ = [0.008 0.09]; % band-pass filter (Hz)
-SIMULT = false;  
-MOT24 = true; 
-N_ACOMP = 20;
-N_AROMA = 0; 
+SIMULT = true;  
+MOT24 = false; 
+N_ACOMP = 15;
+N_AROMA = Inf; % 0
 
 % COND_NAMES = {'random', 'structured', 'switch', 'incorrect'};
 COND_NAMES = {'random', 'str_r12', 'str_r34', 'str_r56', 'str_r78', 'swi_r34', 'swi_r56', 'incorrect'};
