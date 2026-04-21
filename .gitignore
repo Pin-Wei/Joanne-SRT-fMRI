@@ -1,6 +1,7 @@
 
-data/*
-conn_out/*
-figures/*
-tmp/*
-work/*
+conn_out/
+data/
+docs/
+figures/
+tmp/
+work/
