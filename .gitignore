@@ -3,5 +3,6 @@ conn_out/
 data/
 docs/
 figures/
+log/
 tmp/
 work/

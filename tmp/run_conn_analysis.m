@@ -2,7 +2,7 @@ clear; clc; close all;
 
 %% Setup paths 
 
-IP = 23; % 37
+IP = 37; 
 
 if IP == 37
     rootDir = '/media/data3/Joanne_SRT_pw/';
@@ -14,7 +14,9 @@ else
     error('Root directory for this IP address has not yet been defined.');
 end
 
-batchFile = fullfile(rootDir, 'conn_out', 'v5_no_param.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260421.mat');
+
+load(batchFile, 'CONN_x');
 
 %% Configuration
 
@@ -25,9 +27,6 @@ COND_OF_INTEREST = [ ...
     "swi_r34", "swi_r56" ... % "switch"
 ];
 COND_LIST = ["random", COND_OF_INTEREST, "incorrect"];
-
-BS_EFFECT_NAMES = {'AllSubjects', 'ExcludeOutlierSubjects'};
-BS_CONTRAST = [1 0];
 
 CONTRASTS = struct(); 
 for i = 1:numel(COND_OF_INTEREST)
@@ -45,32 +44,36 @@ CONTRASTS(i+2).saveas = 'swi_main';
 CONTRASTS(i+2).between_conditions_names = {'swi_r34', 'swi_r56', 'random'};
 CONTRASTS(i+2).between_conditions_contrast = [1 1 -2];
 
+BS_COVARS = CONN_x.Setup.l2covariates.names;
+if ~contains(BS_COVARS, 'AllSubjects') 
+    disp('In order to ');
+    exit
+end
+
+BS_EFFECT_NAMES = {'AllSubjects'};
+BS_CONTRAST = [1];
+if contains(BS_COVARS, 'ExcludeOutlierSubjects')
+    BS_EFFECT_NAMES = [BS_EFFECT_NAMES, {'ExcludeOutlierSubjects'}];
+    BS_CONTRAST = [BS_CONTRAST 0];
+end
+
 %% First-level analysis 
 % https://web.conn-toolbox.org/fmri-methods/connectivity-measures
 
-conn_batch( ...
-    'filename', batchFile, ...
-    'Analysis.name', ANALYSIS_NAME, ...
-    'Analysis.measure', 3, ...     % regression (bivariate)
-    'Analysis.modulation', 1, ...  % gPPI interaction effect
-    'Analysis.conditions', COND_LIST, ... 
-    'Analysis.type', 3, ...        % ROI-to-ROI & Seed-to-Voxel
-    'Analysis.done', 1, ...
-    'Analysis.overwrite', 'No' ...
-);
-
-%% Second-level analysis 
-
-load(batchFile, 'CONN_x');
-
-if ~contains(CONN_x.Setup.l2covariates.names, 'AllSubjects')
+if ~contains({CONN_x.Analyses.name}, ANALYSIS_NAME)
     conn_batch( ...
         'filename', batchFile, ...
-        'Setup.subjects.groups_names', {'AllSubjects'}, ...
-        'Setup.subjects.groups', {ones(CONN_x.Setup.nsubjects, 1)}, ...
-        'Setup.subjects.add', 1 ...
+        'Analysis.name', ANALYSIS_NAME, ...
+        'Analysis.measure', 3, ...     % regression (bivariate)
+        'Analysis.modulation', 1, ...  % gPPI interaction effect
+        'Analysis.conditions', COND_LIST, ... 
+        'Analysis.type', 3, ...        % ROI-to-ROI & Seed-to-Voxel
+        'Analysis.done', 1, ...
+        'Analysis.overwrite', 'No' ...
     );
 end
+
+%% Second-level analysis 
 
 for i = 1:numel(CONTRASTS)
     try
