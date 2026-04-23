@@ -2,7 +2,7 @@ clear; clc; close all;
 
 %% Setup paths 
 
-IP = 37; % 23
+IP = 23;
 
 if IP == 37
     rootDir = '/media/data3/Joanne_SRT_pw/';
@@ -15,7 +15,7 @@ else
 end
 
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260421.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260423.mat');
 
 [~, fn, ~] = fileparts(batchFile);
 logFile = fullfile(rootDir, 'log', [fn, '.log']);
@@ -98,24 +98,25 @@ CONTRASTS(i+2).between_conditions_contrast = [1 1 -2];
 diary(logFile); 
 
 t = datetime('now'); 
-fprintf('\n====== %s ======\n', t);
-disp('Diary Start!\n');
+fprintf('\r\n============ %s ============\r\n', t);
+fprintf('Diary Start!\r\n');
 
 %% Setup + Denoising
 
 if exist(batchFile, "file")
-    fprintf('\n%s exists. Skip setup and denoising ...', batchFile);
+    fprintf('\r\n%s exists. Skip setup and denoising ...\r\n', batchFile);
 
 else
-    disp('Building initial batch structure (Setup + Denoising) ...');
-    fprintf('Smoothing FWHM (mm)                : %d', FWHM);
-    fprintf('Polynomial detrending order        : %d', POLY_ORD);
-    fprintf('Band-pass filter (Hz)              : %s', BP_HZ);
-    fprintf('Simultaneous regression & band-pass: %s', SIMULT);
-    fprintf('Add quadratic motion parameters    : %s', MOT24);
-    fprintf('Number of aCompCor components      : %d', N_ACOMP);
-    fprintf('Number of ICA-AROMA components     : %d', N_AROMA);
-    fprintf('Add parametric modulation          : %s', ADD_PM);
+    fprintf('\r\nBuilding initial batch structure (Setup + Denoising) ...\r\n');
+    fprintf('\r\nSmoothing FWHM (mm)                : %d', FWHM);
+    fprintf('\r\nPolynomial detrending order        : %d', POLY_ORD);
+    fprintf('\r\nBand-pass filter (Hz)              : %s', num2str(BP_HZ));
+    fprintf('\r\nSimultaneous regression & band-pass: %s', log2str(SIMULT));
+    fprintf('\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
+    fprintf('\r\nNumber of aCompCor components      : %d', N_ACOMP);
+    fprintf('\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
+    fprintf('\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
+    fprintf('\r\n\r\n');
 
     batch = struct();
     batch.filename = batchFile;
@@ -269,7 +270,7 @@ else
 
     t0 = tic;
     conn_batch(batch);
-    fprintf('\n--- Initial Setup + Denoising done (Elapsed time: %.1f min) ---\n', toc(t0)/60);
+    fprintf('\r\n--- Initial Setup + Denoising done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
 end
 
 %% Quality Assurance
@@ -278,6 +279,7 @@ end
 load(batchFile, 'CONN_x');
 global CONN_x;
 
+fprintf('\r\nComputing QC scores ...\r\n');
 try
     t0 = tic;
     s1 = conn_qascores('DataValidity',    [], []);
@@ -285,14 +287,14 @@ try
     s3 = conn_qascores('DataSensitivity', [], [], [], [], 'extreme');
     mean_qc = mean([s1, s2, s3], 'omitnan');
 
-    fprintf('\n--- QC scores calculation completed (Elapsed time: %.1f sec) ---\n', toc(t0));
-    fprintf('Data Validity score   : %.4f', s1);
-    fprintf('Data Quality score    : %.4f', s2);
-    fprintf('Data Sensitivity score: %.4f', s3);
-    fprintf('Mean QC score         : %.4f', mean_qc);
+    fprintf('\r\n--- QC scores calculation completed (Elapsed time: %.1f sec) ---\r\n', toc(t0));
+    fprintf('\r\nData Validity score   : %.4f', s1);
+    fprintf('\r\nData Quality score    : %.4f', s2);
+    fprintf('\r\nData Sensitivity score: %.4f', s3);
+    fprintf('\r\nMean QC score         : %.4f', mean_qc);
 
 catch err
-    fprintf('Failed to compute QC scores:\n%s', err.message);
+    fprintf('\r\nFailed to compute QC scores:\r\n%s\r\n', err.message);
     end_diary();
     exit
 end
@@ -301,10 +303,10 @@ end
 % https://web.conn-toolbox.org/fmri-methods/connectivity-measures
 
 if contains({CONN_x.Analyses.name}, ANALYSIS_NAME)
-    fprintf('\nAnalysis "%s" exists. Not overwriting ...', ANALYSIS_NAME);
+    fprintf('\r\nAnalysis "%s" exists. Not overwriting ...\r\n', ANALYSIS_NAME);
 else
     try
-        fprintf('\nConducting "%s" analysis ...', ANALYSIS_NAME);
+        fprintf('\r\nConducting "%s" analysis ...\r\n\r\n', ANALYSIS_NAME);
         t0 = tic;
         conn_batch( ...
             'filename', batchFile, ...
@@ -316,10 +318,10 @@ else
             'Analysis.done', 1, ...
             'Analysis.overwrite', 'No' ...
         );
-        fprintf('\n--- Analysis done (Elapsed time: %.1f min) ---\n', toc(t0)/60);
+        fprintf('\r\n--- Analysis done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
 
     catch err
-        fprintf('Failed to run first-level analysis:\n%s', err.message);
+        fprintf('\r\nFailed to run first-level analysis:\r\n%s\r\n', err.message);
         end_diary();
         exit
     end
@@ -332,10 +334,10 @@ for i = 1:numel(CONTRASTS)
     fd = fullfile(rootDir, 'conn_out', 'no_PM_260421', 'results', 'secondlevel', ANALYSIS_NAME, C.saveas);
     
     if exist(fd, "dir")
-        fprintf('\nContrast %s may has been analyzed. Skipping it ...', C.saveas);
+        fprintf('\r\nContrast %s may has been analyzed. Skipping it ...\r\n', C.saveas);
     else
         try
-            fprintf('\nAnalyzing contrast %s ...', C.saveas);
+            fprintf('\r\nAnalyzing contrast %s ...\r\n\r\n', C.saveas);
             t0 = tic;
             conn_batch( ...
                 'filename', batchFile, ...
@@ -348,10 +350,10 @@ for i = 1:numel(CONTRASTS)
                 'Results.display', 0, ...
                 'Results.done', 1 ...
             );
-            fprintf('\n--- Done (Elapsed time: %.1f min) ---\n', toc(t0)/60);
+            fprintf('\r\n--- Done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
     
         catch err
-            fprintf('\nFailed to analyze contrast "%s":\n%s\n', C.saveas, err.message);
+            fprintf('\r\nFailed to analyze contrast "%s":\r\n%s\r\n', C.saveas, err.message);
             continue;
         end
     end
@@ -360,9 +362,13 @@ end
 %% End logging
 
 function end_diary()
-    disp('\nDiary End!');
+    fprintf('\r\n\r\nDiary End!');
     t = datetime('now');  
-    fprintf('\n====== %s ======\n', t);
+    fprintf('\r\n====== %s ======\r\n', t);
     
     diary off;
+end
+
+function str = log2str(a)
+    if a, str = 'true'; else, str = 'false'; end
 end
