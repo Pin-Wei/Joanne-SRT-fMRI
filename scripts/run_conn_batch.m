@@ -2,7 +2,7 @@ clear; clc; close all;
 
 %% Setup paths 
 
-IP = 37;
+IP = 23;
 
 if IP == 37
     rootDir = '/media/data3/Joanne_SRT_pw/';
@@ -15,8 +15,7 @@ else
 end
 
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-% batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260423.mat');
-batchFile = fullfile(rootDir, 'conn_out', 'temp.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260424.mat');
 
 [~, fn, ~] = fileparts(batchFile);
 logFile = fullfile(rootDir, 'logs', [fn, '.log']);
@@ -38,8 +37,9 @@ POLY_ORD = 3;            % polynomial detrending order
 BP_HZ    = [0.008 0.09]; % band-pass filter (Hz)
 SIMULT   = false;        % simultaneous regression & band-pass
 MOT24    = true;         % add quadratic motion parameters 
-N_ACOMP  = 20;           % number of aCompCor components
-N_AROMA  = Inf;          % number of ICA-AROMA components
+N_ACOMP  = 5;            % number of aCompCor components
+N_AROMA  = 10;           % number of ICA-AROMA components
+RM_GMR   = true;         % remove the average signal within the grey matter (GM) mask
 
 ADD_PM   = false;        % add parametric modulation
 
@@ -64,7 +64,7 @@ CONFOUND_NAMES = {'realignment', 'scrubbing'};
 if N_ACOMP > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aCompCor'}]; end
 if N_AROMA > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aroma'}]; end
 CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)];
-CONFOUND_NAMES = ['Grey Matter', CONFOUND_NAMES];
+if RM_GMR, CONFOUND_NAMES = ['Grey Matter', CONFOUND_NAMES]; end
 
 % ROI files
 ROI_NAMES = {'atlas', 'networks'}; 
