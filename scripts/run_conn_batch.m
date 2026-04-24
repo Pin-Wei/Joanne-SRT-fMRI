@@ -2,7 +2,7 @@ clear; clc; close all;
 
 %% Setup paths 
 
-IP = 23;
+IP = 37;
 
 if IP == 37
     rootDir = '/media/data3/Joanne_SRT_pw/';
@@ -15,10 +15,11 @@ else
 end
 
 bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260423.mat');
+% batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260423.mat');
+batchFile = fullfile(rootDir, 'conn_out', 'temp.mat');
 
 [~, fn, ~] = fileparts(batchFile);
-logFile = fullfile(rootDir, 'log', [fn, '.log']);
+logFile = fullfile(rootDir, 'logs', [fn, '.log']);
 
 [fd, ~, ~] = fileparts(logFile);
 if ~isfolder(fd), mkdir(fd); end
@@ -63,6 +64,7 @@ CONFOUND_NAMES = {'realignment', 'scrubbing'};
 if N_ACOMP > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aCompCor'}]; end
 if N_AROMA > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aroma'}]; end
 CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)];
+CONFOUND_NAMES = ['Grey Matter', CONFOUND_NAMES];
 
 % ROI files
 ROI_NAMES = {'atlas', 'networks'}; 
@@ -95,28 +97,30 @@ CONTRASTS(i+2).between_conditions_contrast = [1 1 -2];
 
 %% Start logging
 
-diary(logFile); 
+logFID = fopen(logFile, 'a'); 
 
-t = datetime('now'); 
-fprintf('\r\n============ %s ============\r\n', t);
-fprintf('Diary Start!\r\n');
+t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
+fprintf(logFID, '\r\n======================== %s ========================', t);
+fprintf(logFID, '\r\nStart Logging!');
+fprintf(logFID, '\r\n');
 
 %% Setup + Denoising
 
 if exist(batchFile, "file")
-    fprintf('\r\n%s exists. Skip setup and denoising ...\r\n', batchFile);
-
+    fprintf(logFID, '\r\n%s exists. Skip setup and denoising ...', batchFile);
+    fprintf(logFID, '\r\n');
 else
-    fprintf('\r\nBuilding initial batch structure (Setup + Denoising) ...\r\n');
-    fprintf('\r\nSmoothing FWHM (mm)                : %d', FWHM);
-    fprintf('\r\nPolynomial detrending order        : %d', POLY_ORD);
-    fprintf('\r\nBand-pass filter (Hz)              : %s', num2str(BP_HZ));
-    fprintf('\r\nSimultaneous regression & band-pass: %s', log2str(SIMULT));
-    fprintf('\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
-    fprintf('\r\nNumber of aCompCor components      : %d', N_ACOMP);
-    fprintf('\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
-    fprintf('\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
-    fprintf('\r\n\r\n');
+    fprintf(logFID, '\r\nBuilding initial batch structure (Setup + Denoising) ...');
+    fprintf(logFID, '\r\n');
+    fprintf(logFID, '\r\nSmoothing FWHM (mm)                : %d', FWHM);
+    fprintf(logFID, '\r\nPolynomial detrending order        : %d', POLY_ORD);
+    fprintf(logFID, '\r\nBand-pass filter (Hz)              : %s', num2str(BP_HZ));
+    fprintf(logFID, '\r\nSimultaneous regression & band-pass: %s', log2str(SIMULT));
+    fprintf(logFID, '\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
+    fprintf(logFID, '\r\nNumber of aCompCor components      : %d', N_ACOMP);
+    fprintf(logFID, '\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
+    fprintf(logFID, '\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
+    fprintf(logFID, '\r\n');
 
     batch = struct();
     batch.filename = batchFile;
@@ -270,32 +274,37 @@ else
 
     t0 = tic;
     conn_batch(batch);
-    fprintf('\r\n--- Initial Setup + Denoising done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
+    fprintf(logFID, '\r\n--- Finished initial setup + denoising (Elapsed time: %.1f min) ---', toc(t0)/60);
+    fprintf(logFID, '\r\n');
 end
 
 %% Quality Assurance
 % https://web.conn-toolbox.org/fmri-methods/denoising-pipeline#h.p_BaXJei3yiEQh
 
-load(batchFile, 'CONN_x');
-global CONN_x;
-
-fprintf('\r\nComputing QC scores ...\r\n');
 try
+    load(batchFile, 'CONN_x');
+    global CONN_x;
+    
+    fprintf(logFID, '\r\nComputing QC scores ...');
+    fprintf(logFID, '\r\n');
     t0 = tic;
     s1 = conn_qascores('DataValidity',    [], []);
     s2 = conn_qascores('DataQuality',     [], [], L2_COVARS, {});
     s3 = conn_qascores('DataSensitivity', [], [], [], [], 'extreme');
     mean_qc = mean([s1, s2, s3], 'omitnan');
-
-    fprintf('\r\n--- QC scores calculation completed (Elapsed time: %.1f sec) ---\r\n', toc(t0));
-    fprintf('\r\nData Validity score   : %.4f', s1);
-    fprintf('\r\nData Quality score    : %.4f', s2);
-    fprintf('\r\nData Sensitivity score: %.4f', s3);
-    fprintf('\r\nMean QC score         : %.4f', mean_qc);
+    
+    fprintf(logFID, '\r\nData Validity score   : %.4f', s1);
+    fprintf(logFID, '\r\nData Quality score    : %.4f', s2);
+    fprintf(logFID, '\r\nData Sensitivity score: %.4f', s3);
+    fprintf(logFID, '\r\nMean QC score         : %.4f', mean_qc);
+    fprintf(logFID, '\r\n');
+    fprintf(logFID, '\r\n--- Finished QC scores calculation (Elapsed time: %.1f sec) ---\r\n', toc(t0));
+    fprintf(logFID, '\r\n');
 
 catch err
-    fprintf('\r\nFailed to compute QC scores:\r\n%s\r\n', err.message);
-    end_diary();
+    fprintf(logFID, '\r\n*** Failed to compute QC scores ***\r\n');
+    fprintf(logFID, '\r\n%s', err.message);
+    end_logging(logFID);
     exit
 end
 
@@ -303,26 +312,30 @@ end
 % https://web.conn-toolbox.org/fmri-methods/connectivity-measures
 
 if contains({CONN_x.Analyses.name}, ANALYSIS_NAME)
-    fprintf('\r\nAnalysis "%s" exists. Not overwriting ...\r\n', ANALYSIS_NAME);
+    fprintf(logFID, '\r\nAnalysis "%s" exists. Not overwriting ...\r\n', ANALYSIS_NAME);
+    fprintf(logFID, '\r\n');
 else
     try
-        fprintf('\r\nConducting "%s" analysis ...\r\n\r\n', ANALYSIS_NAME);
+        fprintf(logFID, '\r\nConducting "%s" analysis ...\r\n', ANALYSIS_NAME);
+        fprintf(logFID, '\r\n');
         t0 = tic;
         conn_batch( ...
             'filename', batchFile, ...
             'Analysis.name', ANALYSIS_NAME, ...
             'Analysis.measure', 3, ...     % regression (bivariate)
             'Analysis.modulation', 1, ...  % gPPI interaction effect
-            'Analysis.conditions', COND_LIST, ... 
+            'Analysis.conditions', COND_NAMES, ... 
             'Analysis.type', 3, ...        % ROI-to-ROI & Seed-to-Voxel
             'Analysis.done', 1, ...
             'Analysis.overwrite', 'No' ...
         );
-        fprintf('\r\n--- Analysis done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
+        fprintf(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+        fprintf(logFID, '\r\n');
 
     catch err
-        fprintf('\r\nFailed to run first-level analysis:\r\n%s\r\n', err.message);
-        end_diary();
+        fprintf(logFID, '\r\n*** Failed to run first-level analysis ***\r\n');
+        fprintf(logFID, '\r\n%s', err.message);
+        end_logging(logFID);
         exit
     end
 end
@@ -334,10 +347,12 @@ for i = 1:numel(CONTRASTS)
     fd = fullfile(rootDir, 'conn_out', 'no_PM_260421', 'results', 'secondlevel', ANALYSIS_NAME, C.saveas);
     
     if exist(fd, "dir")
-        fprintf('\r\nContrast %s may has been analyzed. Skipping it ...\r\n', C.saveas);
+        fprintf(logFID, '\r\nContrast "%s" may has been analyzed. Skipping it ...', C.saveas);
+        fprintf(logFID, '\r\n');
     else
         try
-            fprintf('\r\nAnalyzing contrast %s ...\r\n\r\n', C.saveas);
+            fprintf(logFID, '\r\nAnalyzing contrast "%s" ...', C.saveas);
+            fprintf(logFID, '\r\n');
             t0 = tic;
             conn_batch( ...
                 'filename', batchFile, ...
@@ -350,23 +365,28 @@ for i = 1:numel(CONTRASTS)
                 'Results.display', 0, ...
                 'Results.done', 1 ...
             );
-            fprintf('\r\n--- Done (Elapsed time: %.1f min) ---\r\n', toc(t0)/60);
-    
+            fprintf(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+            fprintf(logFID, '\r\n');
+
         catch err
-            fprintf('\r\nFailed to analyze contrast "%s":\r\n%s\r\n', C.saveas, err.message);
+            fprintf(logFID, '\r\n*** Failed to analyze contrast "%s" ***\r\n', C.saveas);
+            fprintf(logFID, '\r\n%s', err.message);
             continue;
         end
     end
 end
 
-%% End logging
+end_logging(logFID);
 
-function end_diary()
-    fprintf('\r\n\r\nDiary End!');
-    t = datetime('now');  
-    fprintf('\r\n====== %s ======\r\n', t);
-    
-    diary off;
+%% Functions
+
+function end_logging(fid)
+    fprintf(fid, '\r\n');
+    fprintf(fid, '\r\nEnd Logging!');
+    t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
+    fprintf(fid, '\r\n======================== %s ========================', t);
+    fprintf(fid, '\r\n');
+    fclose(fid);
 end
 
 function str = log2str(a)
