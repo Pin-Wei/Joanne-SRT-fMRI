@@ -100,27 +100,28 @@ CONTRASTS(i+2).between_conditions_contrast = [1 1 -2];
 logFID = fopen(logFile, 'a'); 
 
 t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
-fprintf(logFID, '\r\n======================== %s ========================', t);
-fprintf(logFID, '\r\nStart Logging!');
-fprintf(logFID, '\r\n');
+write_log(logFID, '\r\n======================== %s ========================', t);
+write_log(logFID, '\r\nStart Logging!');
+write_log(logFID, '\r\n');
 
 %% Setup + Denoising
 
-if exist(batchFile, "file")
-    fprintf(logFID, '\r\n%s exists. Skip setup and denoising ...', batchFile);
-    fprintf(logFID, '\r\n');
+if exist(batchFile, 'file')
+    write_log(logFID, '\r\n"%s" exists.', batchFile);
+    write_log(logFID, '\r\nSkip setup and denoising ...');
+    write_log(logFID, '\r\n');
 else
-    fprintf(logFID, '\r\nBuilding initial batch structure (Setup + Denoising) ...');
-    fprintf(logFID, '\r\n');
-    fprintf(logFID, '\r\nSmoothing FWHM (mm)                : %d', FWHM);
-    fprintf(logFID, '\r\nPolynomial detrending order        : %d', POLY_ORD);
-    fprintf(logFID, '\r\nBand-pass filter (Hz)              : %s', num2str(BP_HZ));
-    fprintf(logFID, '\r\nSimultaneous regression & band-pass: %s', log2str(SIMULT));
-    fprintf(logFID, '\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
-    fprintf(logFID, '\r\nNumber of aCompCor components      : %d', N_ACOMP);
-    fprintf(logFID, '\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
-    fprintf(logFID, '\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
-    fprintf(logFID, '\r\n');
+    write_log(logFID, '\r\nBuilding initial batch structure (Setup + Denoising) ...');
+    write_log(logFID, '\r\n');
+    write_log(logFID, '\r\nSmoothing FWHM (mm)                : %d', FWHM);
+    write_log(logFID, '\r\nPolynomial detrending order        : %d', POLY_ORD);
+    write_log(logFID, '\r\nBand-pass filter (Hz)              : %s', num2str(BP_HZ));
+    write_log(logFID, '\r\nSimultaneous regression & band-pass: %s', log2str(SIMULT));
+    write_log(logFID, '\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
+    write_log(logFID, '\r\nNumber of aCompCor components      : %d', N_ACOMP);
+    write_log(logFID, '\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
+    write_log(logFID, '\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
+    write_log(logFID, '\r\n');
 
     batch = struct();
     batch.filename = batchFile;
@@ -237,7 +238,7 @@ else
     
     batch.Setup.outputfiles = [1 1 0 0 0 0]; % create confound beta-maps & confound-corrected timeseries
     batch.Setup.done        = 1;
-    batch.Setup.overwrite   = 'No';
+    batch.Setup.overwrite   = 1;
 
     % Denoising step ------------------------------------------------------
     % https://web.conn-toolbox.org/fmri-methods/denoising-pipeline
@@ -270,12 +271,12 @@ else
     end
     
     batch.Denoising.done      = 1;
-    batch.Denoising.overwrite = 'No';
+    batch.Denoising.overwrite = 1;
 
     t0 = tic;
     conn_batch(batch);
-    fprintf(logFID, '\r\n--- Finished initial setup + denoising (Elapsed time: %.1f min) ---', toc(t0)/60);
-    fprintf(logFID, '\r\n');
+    write_log(logFID, '\r\n--- Finished initial setup + denoising (Elapsed time: %.1f min) ---', toc(t0)/60);
+    write_log(logFID, '\r\n');
 end
 
 %% Quality Assurance
@@ -284,26 +285,34 @@ end
 try
     load(batchFile, 'CONN_x');
     global CONN_x;
-    
-    fprintf(logFID, '\r\nComputing QC scores ...');
-    fprintf(logFID, '\r\n');
-    t0 = tic;
-    s1 = conn_qascores('DataValidity',    [], []);
-    s2 = conn_qascores('DataQuality',     [], [], L2_COVARS, {});
-    s3 = conn_qascores('DataSensitivity', [], [], [], [], 'extreme');
-    mean_qc = mean([s1, s2, s3], 'omitnan');
-    
-    fprintf(logFID, '\r\nData Validity score   : %.4f', s1);
-    fprintf(logFID, '\r\nData Quality score    : %.4f', s2);
-    fprintf(logFID, '\r\nData Sensitivity score: %.4f', s3);
-    fprintf(logFID, '\r\nMean QC score         : %.4f', mean_qc);
-    fprintf(logFID, '\r\n');
-    fprintf(logFID, '\r\n--- Finished QC scores calculation (Elapsed time: %.1f sec) ---\r\n', toc(t0));
-    fprintf(logFID, '\r\n');
 
+    [fp, fn, ~] = fileparts(batchFile);
+    globQA = dir(fullfile(fp, fn, 'results', 'qa', 'QA_GUIrequest_*'));
+
+    if ~isempty(globQA)
+        write_log(logFID, '\r\nQC scores may have been computed. Skipping ...');
+        write_log(logFID, '\r\n');
+    else
+        write_log(logFID, '\r\nComputing QC scores ...');
+        write_log(logFID, '\r\n');
+        t0 = tic;
+        s1 = conn_qascores('DataValidity', [], []);
+        s2 = conn_qascores('DataQuality', [], [], L2_COVARS, {});
+        s3 = conn_qascores('DataSensitivity', [], [], [], [], 'extreme');
+        mean_qc = mean([s1, s2, s3], 'omitnan');
+
+        write_log(logFID, '\r\nData Validity score   : %.4f', s1);
+        write_log(logFID, '\r\nData Quality score    : %.4f', s2);
+        write_log(logFID, '\r\nData Sensitivity score: %.4f', s3);
+        write_log(logFID, '\r\nMean QC score         : %.4f', mean_qc);
+        write_log(logFID, '\r\n');
+        write_log(logFID, '\r\n--- Finished QC scores calculation (Elapsed time: %.1f sec) ---', toc(t0));
+        write_log(logFID, '\r\n');
+    end
 catch err
-    fprintf(logFID, '\r\n*** Failed to compute QC scores ***\r\n');
-    fprintf(logFID, '\r\n%s', err.message);
+    write_log(logFID, '\r\n*** Failed to compute QC scores ***');
+    write_log(logFID, '\r\n%s', err.message);
+    write_log(logFID, '\r\n');
     end_logging(logFID);
     exit
 end
@@ -311,13 +320,13 @@ end
 %% First-level analysis 
 % https://web.conn-toolbox.org/fmri-methods/connectivity-measures
 
-if contains({CONN_x.Analyses.name}, ANALYSIS_NAME)
-    fprintf(logFID, '\r\nAnalysis "%s" exists. Not overwriting ...\r\n', ANALYSIS_NAME);
-    fprintf(logFID, '\r\n');
+if any(contains({CONN_x.Analyses.name}, ANALYSIS_NAME))
+    write_log(logFID, '\r\nAnalysis "%s" exists. Not overwriting ...', ANALYSIS_NAME);
+    write_log(logFID, '\r\n');
 else
     try
-        fprintf(logFID, '\r\nConducting "%s" analysis ...\r\n', ANALYSIS_NAME);
-        fprintf(logFID, '\r\n');
+        write_log(logFID, '\r\nConducting "%s" analysis ...', ANALYSIS_NAME);
+        write_log(logFID, '\r\n');
         t0 = tic;
         conn_batch( ...
             'filename', batchFile, ...
@@ -327,14 +336,15 @@ else
             'Analysis.conditions', COND_NAMES, ... 
             'Analysis.type', 3, ...        % ROI-to-ROI & Seed-to-Voxel
             'Analysis.done', 1, ...
-            'Analysis.overwrite', 'No' ...
+            'Analysis.overwrite', 1 ...
         );
-        fprintf(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
-        fprintf(logFID, '\r\n');
+        write_log(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+        write_log(logFID, '\r\n');
 
     catch err
-        fprintf(logFID, '\r\n*** Failed to run first-level analysis ***\r\n');
-        fprintf(logFID, '\r\n%s', err.message);
+        write_log(logFID, '\r\n*** Failed to run first-level analysis ***');
+        write_log(logFID, '\r\n%s', err.message);
+        write_log(logFID, '\r\n');
         end_logging(logFID);
         exit
     end
@@ -342,17 +352,28 @@ end
 
 %% Second-level analysis 
 
+if ~any(contains(CONN_x.Setup.l2covariates.names, 'AllSubjects'))
+    icov = numel(CONN_x.Setup.l2covariates.names); 
+    CONN_x.Setup.l2covariates.names{icov} = 'AllSubjects';
+    for isub = 1:CONN_x.Setup.nsubjects
+        CONN_x.Setup.l2covariates.values{isub}{icov} = 1;
+    end
+    CONN_x.Setup.l2covariates.names{end+1}=' '; 
+    conn save;
+end
+
 for i = 1:numel(CONTRASTS)
     C = CONTRASTS(i);
-    fd = fullfile(rootDir, 'conn_out', 'no_PM_260421', 'results', 'secondlevel', ANALYSIS_NAME, C.saveas);
+    [fp, ~, ~] = fileparts(batchFile);
+    globResult = dir(fullfile(rootDir, 'conn_out', fp, 'results', 'secondlevel', ANALYSIS_NAME, C.saveas));
     
-    if exist(fd, "dir")
-        fprintf(logFID, '\r\nContrast "%s" may has been analyzed. Skipping it ...', C.saveas);
-        fprintf(logFID, '\r\n');
+    if ~isempty(globResult)
+        write_log(logFID, '\r\nContrast "%s" may has been analyzed. Skipping ...', C.saveas);
+        write_log(logFID, '\r\n');
     else
         try
-            fprintf(logFID, '\r\nAnalyzing contrast "%s" ...', C.saveas);
-            fprintf(logFID, '\r\n');
+            write_log(logFID, '\r\nAnalyzing contrast "%s" ...', C.saveas);
+            write_log(logFID, '\r\n');
             t0 = tic;
             conn_batch( ...
                 'filename', batchFile, ...
@@ -365,12 +386,13 @@ for i = 1:numel(CONTRASTS)
                 'Results.display', 0, ...
                 'Results.done', 1 ...
             );
-            fprintf(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
-            fprintf(logFID, '\r\n');
+            write_log(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+            write_log(logFID, '\r\n');
 
         catch err
-            fprintf(logFID, '\r\n*** Failed to analyze contrast "%s" ***\r\n', C.saveas);
-            fprintf(logFID, '\r\n%s', err.message);
+            write_log(logFID, '\r\n*** Failed to analyze contrast "%s" ***', C.saveas);
+            write_log(logFID, '\r\n%s', err.message);
+            write_log(logFID, '\r\n');
             continue;
         end
     end
@@ -380,12 +402,17 @@ end_logging(logFID);
 
 %% Functions
 
+function write_log(fid, fmt, varargin)
+    msg  = sprintf(fmt, varargin{:});
+    fprintf('%s', msg);
+    if fid > 0, fprintf(fid, '%s', msg); end
+end
+
 function end_logging(fid)
-    fprintf(fid, '\r\n');
-    fprintf(fid, '\r\nEnd Logging!');
+    write_log(fid, '\r\nEnd Logging!');
     t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
-    fprintf(fid, '\r\n======================== %s ========================', t);
-    fprintf(fid, '\r\n');
+    write_log(fid, '\r\n======================== %s ========================', t);
+    write_log(fid, '\r\n');
     fclose(fid);
 end
 
