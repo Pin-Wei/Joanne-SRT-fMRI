@@ -6,8 +6,8 @@ import shutil
 import numpy as np
 import pandas as pd
 
-import warnings
-warnings.simplefilter('ignore', np.RankWarning)
+# import warnings
+# warnings.simplefilter('ignore', np.RankWarning)
 
 class Config:
     def __init__(self):
@@ -148,6 +148,8 @@ def make_event_files(df, config, default_dur=1, default_mod=1):
             "incorrect" : sub_df.query("correct == 0").reset_index(drop=True), 
             "random"    : sub_df.query("rule == 'Ran'").reset_index(drop=True), 
             "structured": sub_df.query("rule in ['StrA', 'StrB']").reset_index(drop=True), 
+            "str_fst"   : sub_df.query("rule_group == 'Str1'").reset_index(drop=True), 
+            "str_snd"   : sub_df.query("rule_group == 'Str2'").reset_index(drop=True), 
             "switch"    : sub_df.query("str_switch == 1").reset_index(drop=True), 
             # "adapt"     : sub_df.query("str_switch == 1").reset_index(drop=True), 
             "slope"     : sub_df, 

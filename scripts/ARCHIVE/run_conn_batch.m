@@ -1,11 +1,38 @@
 clear; clc; close all;
 
-%% Configuration
+%% Setup paths 
 
 IP = 23;
-PROJECT = 'no_PM_260506';
+
+if IP == 37
+    rootDir = '/media/data3/Joanne_SRT_pw/';
+    connDir = '/home/aclexp/mytools/matlab/conn';
+elseif IP == 23
+    rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/';
+    connDir = '/home/aclexp/Software/conn';
+else 
+    error('Root directory for this IP address has not yet been defined.');
+end
+
+bidsDir = fullfile(rootDir, 'data', 'fmriprep');
+batchFile = fullfile(rootDir, 'conn_out', 'no_PM_260504.mat');
+
+[~, fn, ~] = fileparts(batchFile);
+logFile = fullfile(rootDir, 'logs', [fn, '.log']);
+
+[fd, ~, ~] = fileparts(logFile);
+if ~isfolder(fd), mkdir(fd); end
+
+%% Configuration
+
+SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
+N_SUBJS  = length(SID_LIST);
+N_RUNS   = 8; 
+TR       = 2.0; 
+SPACE    = 'MNI152NLin2009cAsym';
 
 FWHM     = 6;            % smoothing fwhm (mm)
+
 POLY_ORD = 3;            % polynomial detrending order
 BP_HZ    = [0.008 0.09]; % band-pass filter (Hz)
 SIMULT   = false;        % simultaneous regression & band-pass
@@ -14,27 +41,35 @@ N_ACOMP  = 5;            % number of aCompCor components
 N_AROMA  = 10;           % number of ICA-AROMA components
 RM_GMR   = true;         % remove the average signal within the grey matter (GM) mask
 
+ADD_PM   = false;        % add parametric modulation
+
 % Conditions
 COND_OF_INTEREST = [ ...
-    "str_fst_r1", "str_fst_r2", "str_fst_r3", "str_fst_r4", "str_fst_r5", "str_fst_r6", ... 
-    "str_snd_r3", "str_snd_r4", "str_snd_r5", "str_snd_r6", "str_snd_r7", "str_snd_r8", ... 
-    "swi_r3", "swi_r4", "swi_r5" "swi_r6" ... 
+    "str_r12", "str_r34", "str_r56", "str_r78", ... % "structured"
+    "swi_r34", "swi_r56" ... % "switch"
 ];
 COND_NAMES = ["random", COND_OF_INTEREST, "incorrect"];
 N_CONDS = numel(COND_NAMES);
 
 % Covariates
 COVAR_NAMES = {'realignment', 'fd', 'scrubbing', 'aCompCor', 'aroma'};
+if ADD_PM, COVAR_NAMES = [COVAR_NAMES, {'slope'}]; end
 N_COVARS = numel(COVAR_NAMES);
 
 L2_COVARS = {'QC_MeanMotion', 'QC_InvalidScans'};
 
-% Confounds
+% Confounds -- can be 'Grey Matter', 'White Matter', 'CSF', any ROI name, 
+% any covariate name, or 'Effect of *' where * represents any condition name.
 CONFOUND_NAMES = {'realignment', 'scrubbing'};
 if N_ACOMP > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aCompCor'}]; end
 if N_AROMA > 0, CONFOUND_NAMES = [CONFOUND_NAMES, {'aroma'}]; end
-CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)]; 
+CONFOUND_NAMES = [CONFOUND_NAMES, append('Effect of ', COND_NAMES)];
 if RM_GMR, CONFOUND_NAMES = ['Grey Matter', CONFOUND_NAMES]; end
+
+% ROI files
+ROI_NAMES = {'atlas', 'networks'}; 
+ROI_FILES = {fullfile(connDir, 'rois', 'atlas.nii'), ...
+             fullfile(connDir, 'rois', 'networks.nii')}; 
 
 % Name of analysis 
 ANALYSIS_NAME = 'gPPI';
@@ -52,50 +87,18 @@ for i = 1:numel(COND_OF_INTEREST)
     CONTRASTS(i).between_conditions_contrast = [1 -1];
 end
 
-CONTRASTS(i+1).saveas = 'str_fst';
-CONTRASTS(i+1).between_conditions_names = {'str_fst_r1', 'str_fst_r2', 'str_fst_r3', 'str_fst_r4', 'str_fst_r5', 'str_fst_r6', 'random'};
-CONTRASTS(i+1).between_conditions_contrast = [1 1 1 1 1 1 -6];
+CONTRASTS(i+1).saveas = 'str_main';
+CONTRASTS(i+1).between_conditions_names = {'str_r12', 'str_r34', 'str_r56', 'str_r78', 'random'};
+CONTRASTS(i+1).between_conditions_contrast = [1 1 1 1 -4];
 
-CONTRASTS(i+2).saveas = 'str_snd';
-CONTRASTS(i+2).between_conditions_names = {'str_snd_r3', 'str_snd_r4', 'str_snd_r5', 'str_snd_r6', 'str_snd_r7', 'str_snd_r8', 'random'};
-CONTRASTS(i+2).between_conditions_contrast = [1 1 1 1 1 1 -6];
-
-CONTRASTS(i+3).saveas = 'switch';
-CONTRASTS(i+3).between_conditions_names = {'swi_r3', 'swi_r4', 'swi_r5', 'swi_r6', 'random'};
-CONTRASTS(i+3).between_conditions_contrast = [1 1 1 1 -4];
-
-% stable ------------------------------------------------------------------
-
-if IP == 37
-    rootDir = '/media/data3/Joanne_SRT_pw/';
-    connDir = '/home/aclexp/mytools/matlab/conn';
-elseif IP == 23
-    rootDir = '/home/aclexp/pinwei/Joanne_SRT_fMRI/';
-    connDir = '/home/aclexp/Software/conn';
-else 
-    error('Root directory for this IP address has not yet been defined.');
-end
-
-bidsDir = fullfile(rootDir, 'data', 'fmriprep');
-batchFile = fullfile(rootDir, 'conn_out', [PROJECT, '.mat']);
-logFile = fullfile(rootDir, 'logs', [PROJECT, '.log']);
-
-[fd, ~, ~] = fileparts(logFile);
-if ~isfolder(fd), mkdir(fd); end
-
-SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
-N_SUBJS  = length(SID_LIST);
-N_RUNS   = 8; 
-TR       = 2.0; 
-SPACE    = 'MNI152NLin2009cAsym';
-
-ROI_NAMES = {'atlas', 'networks'}; 
-ROI_FILES = {fullfile(connDir, 'rois', 'atlas.nii'), ...
-             fullfile(connDir, 'rois', 'networks.nii')}; 
+CONTRASTS(i+2).saveas = 'swi_main';
+CONTRASTS(i+2).between_conditions_names = {'swi_r34', 'swi_r56', 'random'};
+CONTRASTS(i+2).between_conditions_contrast = [1 1 -2];
 
 %% Start logging
 
 logFID = fopen(logFile, 'a'); 
+
 t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
 write_log(logFID, '\r\n======================== %s ========================', t);
 write_log(logFID, '\r\nStart Logging!');
@@ -117,6 +120,7 @@ else
     write_log(logFID, '\r\nAdd quadratic motion parameters    : %s', log2str(MOT24));
     write_log(logFID, '\r\nNumber of aCompCor components      : %d', N_ACOMP);
     write_log(logFID, '\r\nNumber of ICA-AROMA components     : %d', N_AROMA);
+    write_log(logFID, '\r\nAdd parametric modulation          : %s', log2str(ADD_PM));
     write_log(logFID, '\r\n');
 
     batch = struct();
@@ -167,9 +171,35 @@ else
             % Condition event files
             for icond = 1:N_CONDS
                 condName = COND_NAMES{icond};
-                [onsets, durations] = cond_setter(condName, irun, subj, bidsDir);
-                batch.Setup.conditions.onsets{icond}{isub}{irun} = onsets;
-                batch.Setup.conditions.durations{icond}{isub}{irun} = durations;
+    
+                if contains(condName, 'str_')
+                    if ~contains(condName, num2str(irun))
+                        batch.Setup.conditions.onsets{icond}{isub}{irun} = [];
+                        batch.Setup.conditions.durations{icond}{isub}{irun} = [];
+                        continue
+                    end
+                    condName = 'structured';
+    
+                elseif contains(condName, 'swi_')
+                    if ~contains(condName, num2str(irun))
+                        batch.Setup.conditions.onsets{icond}{isub}{irun} = [];
+                        batch.Setup.conditions.durations{icond}{isub}{irun} = [];
+                        continue
+                    end
+                    condName = 'switch';
+                end
+                
+                condFile = fullfile(bidsDir, subj, 'func', ...
+                    'events', sprintf('%s_run-%02d.tsv', condName, irun));
+                condData = readtable(condFile, 'FileType', 'text', 'Delimiter', '\t');
+                
+                batch.Setup.conditions.onsets{icond}{isub}{irun}    = condData.onset;
+                batch.Setup.conditions.durations{icond}{isub}{irun} = condData.duration;
+                
+                % Including a parametric modulator
+                if strcmp(condName, 'structured') && any(contains(COVAR_NAMES, 'slope'))
+                    batch.Setup.conditions.param(icond) = find(strcmp(COVAR_NAMES, 'slope')); 
+                end
             end
     
             % Covariate timeseries
@@ -178,7 +208,7 @@ else
                 covarFile = fullfile(bidsDir, subj, 'func', ...
                     'covariates', sprintf('%s_run-%02d.tsv', covarName, irun));
                 covarData = readtable(covarFile, 'FileType', 'text', 'Delimiter', '\t'); 
-                
+    
                 if ~isempty(covarData)
                     batch.Setup.covariates.files{icov}{isub}{irun} = covarFile;
                 end
@@ -256,7 +286,7 @@ end
 % https://web.conn-toolbox.org/fmri-methods/denoising-pipeline#h.p_BaXJei3yiEQh
 
 try
-    conn('load', batchFile); 
+    load(batchFile, 'CONN_x');
     global CONN_x;
 
     [fp, fn, ~] = fileparts(batchFile);
@@ -273,7 +303,6 @@ try
         s2 = conn_qascores('DataQuality', [], [], L2_COVARS, {});
         s3 = conn_qascores('DataSensitivity', [], [], [], [], 'extreme');
         mean_qc = mean([s1, s2, s3], 'omitnan');
-        conn save; 
 
         write_log(logFID, '\r\nData Validity score   : %.4f', s1);
         write_log(logFID, '\r\nData Quality score    : %.4f', s2);
@@ -294,7 +323,7 @@ end
 %% First-level analysis 
 % https://web.conn-toolbox.org/fmri-methods/connectivity-measures
 
-if any(matches({CONN_x.Analyses.name}, ANALYSIS_NAME))
+if any(contains({CONN_x.Analyses.name}, ANALYSIS_NAME))
     write_log(logFID, '\r\nAnalysis "%s" exists. Not overwriting ...', ANALYSIS_NAME);
     write_log(logFID, '\r\n');
 else
@@ -312,7 +341,6 @@ else
             'Analysis.done', 1, ...
             'Analysis.overwrite', 1 ...
         );
-        conn save; 
         write_log(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
         write_log(logFID, '\r\n');
 
@@ -327,10 +355,22 @@ end
 
 %% Second-level analysis 
 
+% if ~any(contains(CONN_x.Setup.l2covariates.names, 'AllSubjects'))
+%     icov = numel(CONN_x.Setup.l2covariates.names); 
+%     CONN_x.Setup.l2covariates.names{icov} = 'AllSubjects';
+%     for isub = 1:CONN_x.Setup.nsubjects
+%         CONN_x.Setup.l2covariates.values{isub}{icov} = 1;
+%     end
+%     CONN_x.Setup.l2covariates.names{end+1}=' '; 
+%     conn save;
+% end
+
 for i = 1:numel(CONTRASTS)
     C = CONTRASTS(i);
+    [fp, ~, ~] = fileparts(batchFile);
+    globResult = dir(fullfile(rootDir, 'conn_out', fp, 'results', 'secondlevel', ANALYSIS_NAME, C.saveas));
     
-    if any(matches(CONN_x.Results.saved.names, C.saveas))
+    if ~isempty(globResult)
         write_log(logFID, '\r\nContrast "%s" may has been analyzed. Skipping ...', C.saveas);
         write_log(logFID, '\r\n');
     else
@@ -365,37 +405,6 @@ end_logging(logFID);
 
 %% Functions
 
-function [onsets, durations] = cond_setter(condName, irun, subj, bidsDir)
-    onsets = []; durations = []; 
-
-    prefixes = {'str_', 'str_fst', 'str_snd', 'swi_'};
-    if any(startsWith(condName, prefixes)) && ~contains(condName, num2str(irun))
-        return; 
-    end
-
-    if startsWith(condName, 'str_')
-        fileTag = 'structured';
-    elseif startsWith(condName, 'str_fst')
-        fileTag = 'str_fst';
-    elseif startsWith(condName, 'str_snd')
-        fileTag = 'str_snd';
-    elseif startsWith(condName, 'swi_')
-        fileTag = 'switch';
-    else
-        fileTag = condName; 
-    end
-    condFile  = fullfile(bidsDir, subj, 'func', ...
-        'events', sprintf('%s_run-%02d.tsv', fileTag, irun));
-
-    if isfile(condFile)
-        condData  = readtable(condFile, 'FileType', 'text', 'Delimiter', '\t');
-        onsets    = condData.onset; 
-        durations = condData.duration;
-    else
-        warning('File not found: %s', condFile);
-    end
-end
-
 function write_log(fid, fmt, varargin)
     msg  = sprintf(fmt, varargin{:});
     fprintf('%s', msg);
@@ -411,7 +420,5 @@ function end_logging(fid)
 end
 
 function str = log2str(a)
-    if a, str = 'true'; 
-    else, str = 'false'; 
-    end
+    if a, str = 'true'; else, str = 'false'; end
 end
