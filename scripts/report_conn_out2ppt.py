@@ -13,6 +13,7 @@ try:
     from pptx.util import Inches, Pt
     from pptx.dml.color import RGBColor
     from pptx.enum.text import PP_ALIGN, MSO_AUTO_SIZE
+    from pptx.enum.shapes import PP_PLACEHOLDER
     from pptx.oxml.xmlchemy import OxmlElement
     from pptx.oxml.ns import qn
 except ImportError:
@@ -169,7 +170,8 @@ def setup_and_get_master_layout(prs, layout_name, const):
             parent.append(child)
         return child
 
-    def _set_ph(shape, pos, font_size, align, anchor, bold=False):
+    def _set_ph(shape, pos, font_size, align, anchor, 
+                bold=False, italic=False, underline=False, is_slide_num=False):
         shape.left, shape.top, shape.width, shape.height = pos
 
         txBody = shape._element.txBody
@@ -182,15 +184,27 @@ def setup_and_get_master_layout(prs, layout_name, const):
 
         defRPr = _get_or_add(lvl1pPr, "a:defRPr")
         defRPr.set("sz", str(int(font_size.pt * 100))) # pt -> twips
+
         if bold:
             defRPr.set("b", "1")
         else:
             defRPr.attrib.pop("b", None)
 
+        if italic:
+            defRPr.set("i", "1")
+        else:
+            defRPr.attrib.pop("i", None)
+
+        if underline:
+            defRPr.set("u", "sng")
+        else:
+            defRPr.attrib.pop("u", None)
+
         latin = _get_or_add(defRPr, "a:latin")
         latin.set("typeface", const.master_font_name)
 
-        shape.text_frame.clear() # avoid leaving sample text in the layout placeholder
+        if not is_slide_num:
+            shape.text_frame.clear() # avoid leaving sample text in the layout placeholder
 
     master = prs.slide_master # since most presentations have only a single slide master
 
@@ -239,6 +253,17 @@ def setup_and_get_master_layout(prs, layout_name, const):
                         align="left", 
                         anchor="top"
                     )
+
+            if "Slide Number" in shape.name:
+                _set_ph(
+                    shape, 
+                    pos=const.slide_num_pos, 
+                    font_size=const.slide_num_font_size, 
+                    align="right", 
+                    anchor="bottom", 
+                    italic=True, 
+                    is_slide_num=True
+                )
             
         return layout
     
@@ -322,6 +347,7 @@ def add_contrast_title(tf, contrast, view_name, const):
         r2._r.get_or_add_rPr().set("baseline", "-25000") # subscripts
         r2.font.color.rgb = color
         r2.font.bold = True
+        r2.font.italic = True
     
     def _add_minus_random(p):
         r3 = p.add_run()
@@ -455,17 +481,17 @@ def add_figure_and_footnote(slide, fig_path, footnote, const):
     p.font.color.rgb = const.foot_color
     tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
 
-def add_slide_number(prs, const):
-    for i, slide in enumerate(prs.slides):
-        tb = slide.shapes.add_textbox(
-            const.slide_num_pos[0], const.slide_num_pos[1], const.slide_num_pos[2], const.slide_num_pos[3]
-        )
-        tf = tb.text_frame
-        p = tf.paragraphs[0]
-        p.text = str(i + 1)
-        p.font.size = const.slide_num_font_size
-        p.font.italic = True
-        p.alignment = PP_ALIGN.RIGHT
+# def add_slide_number(prs, const):
+    # for i, slide in enumerate(prs.slides):
+    #     tb = slide.shapes.add_textbox(
+    #         const.slide_num_pos[0], const.slide_num_pos[1], const.slide_num_pos[2], const.slide_num_pos[3]
+    #     )
+    #     tf = tb.text_frame
+    #     p = tf.paragraphs[0]
+    #     p.text = str(i + 1)
+    #     p.font.size = const.slide_num_font_size
+    #     p.font.italic = True
+    #     p.alignment = PP_ALIGN.RIGHT
 
 def main():
     args = parse_args()
@@ -514,6 +540,7 @@ def main():
 
     # Load summary CSV and loop over each row (contrast) to add slides
     summary_csv = pd.read_csv(os.path.join(config.report_dir, "summary.csv"), header=0)
+    summary_csv.sort_values(by=["contrast"], inplace=True)
 
     for _, row in summary_csv.iterrows():
         contrast   = row["contrast"]
@@ -553,8 +580,8 @@ def main():
                 footnote = f"n_clusters = {n_clusters}"
                 add_figure_and_footnote(slide, fig_path, footnote, const)
 
-    # Add slide number
-    add_slide_number(prs, const)
+    # # Add slide number
+    # add_slide_number(prs, const)
 
     # Save presentation
     prs.save(config.report_path)

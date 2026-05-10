@@ -3,9 +3,9 @@ clear; clc; close all;
 %% Configuration
 
 IP = 23;
-PROJECT = 'no_PM_260506';
+PROJECT = 'no_PM_260504';
 ANALYSIS = 'gPPI';
-PRESET = 2;
+PRESET = 3;
 ROI_PREFIX = 'networks';
 OVERWRITE = false;
 
@@ -150,6 +150,7 @@ function n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX)
             parts = regexp(row, '^Cluster\s+(\d+)\/\d+\s+(.*\s*=\s*[\d.]+)\s+(.*)', 'tokens', 'once');
             cid = str2double(parts{1}); 
             statRes = strtrim(parts{2});
+            statRes = replace(statRes, ',', ' ');
             pVals = regexp(parts{3}, '\s{2,}', 'split');
             pUnc = strtrim(pVals{1});
             pFDR = strtrim(pVals{2}); 
