@@ -38,7 +38,7 @@ class Config:
         }[args.preset]
         self.title = "ROI-to-ROI gPPI results"
         self.subtitle = (
-            f"Project: {args.project}\n" + 
+            # f"Project: {args.project}\n" + 
             f"ROI prefix: {args.roi_prefix}\n" +
             f"Inference preset: {self.preset} ({self.preset_full})"
         )
@@ -416,6 +416,7 @@ def add_stats_table(slide, stats_df, const):
     
     tbl_height = const.tbl_row_height * n_rows
     tbl_top = (const.slide_num_pos[1] - const.master_l1_content_pos[1] - tbl_height) // 2 
+    tbl_top = const.master_l1_content_pos[1] if tbl_top < const.master_l1_content_pos[1] else tbl_top
 
     table = slide.shapes.add_table(
         n_rows, n_cols, 
@@ -509,7 +510,9 @@ def main():
     # Slide 1: Title 
     slide = prs.slides.add_slide(layout_0)
     slide.shapes.title.text = config.title
-    slide.placeholders[1].text = config.subtitle
+    # slide.placeholders[1].text = config.subtitle
+    tf = slide.placeholders[1].text_frame
+    add_bullet_points(tf, config.subtitle.split("\n"), const)
 
     # Slide 2: Preprocessing & Denoising parameters
     slide = prs.slides.add_slide(layout_1)

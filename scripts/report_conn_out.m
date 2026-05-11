@@ -1,129 +1,141 @@
-clear; clc; close all;
+function report_conn_out(varargin)
+    clc; close all;
 
-%% Configuration
-
-IP = 23;
-PROJECT = 'no_PM_260504';
-ANALYSIS = 'gPPI';
-PRESET = 3;
-ROI_PREFIX = 'networks';
-OVERWRITE = false;
-
-% stable ------------------------------------------------------------------
-
-if IP == 37, ROOT_DIR = '/media/data3/Joanne_SRT_pw/';
-elseif IP == 23, ROOT_DIR = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
-else, error('Root directory for this IP address has not yet been defined.'); 
-end
-
-PROJ_MAT = fullfile(ROOT_DIR, 'conn_out', [PROJECT, '.mat']);
-PROJ_DIR = fullfile(ROOT_DIR, 'conn_out', PROJECT);
-ANA2_DIR = fullfile(PROJ_DIR, 'results', 'secondlevel', ANALYSIS);
-
-PRESET_NAMES = {'FNC', 'SPC', 'TFCE'};
-PRESET_NAME  = PRESET_NAMES{PRESET};
-
-OUT_DIR   = fullfile(ROOT_DIR, 'reports', PROJECT, ['ROI-', ROI_PREFIX, '_', PRESET_NAME]);
-FIGS_DIR  = fullfile(OUT_DIR, 'figs');
-STATS_DIR = fullfile(OUT_DIR, 'stats');
-BM_DIR    = fullfile(OUT_DIR, 'bookmarks');
-for fd = {FIGS_DIR, STATS_DIR, BM_DIR}, if ~isfolder(fd{1}), mkdir(fd{1}); end; end
-
-assert(exist(PROJ_MAT, 'file'), 'CONN project not exists.');
-load(PROJ_MAT, 'CONN_x');
-CONTRASTS = CONN_x.Results.saved.names;
-
-%% Main
-
-summary = cell(numel(CONTRASTS), 7);
-hdr = {'contrast', 'n_clusters', 'ring_jpg', 'matrix_jpg', 'brain_jpg', 'stats_csv', 'note'};
-
-for ic = 1:numel(CONTRASTS)
-    contrast = CONTRASTS{ic};
-    roiMat = fullfile(ANA2_DIR, contrast, 'ROI.mat');
+    % Configuration -------------------------------------------------------
     
-    try
-        hfig = conn_displayroi('initfile', roiMat);
-        drawnow;        
-        data = get(hfig, 'userdata');
+    p = inputParser;
+    addOptional(p, 'IP', 23);
+    addOptional(p, 'PROJECT', 'no_PM_260504');
+    addOptional(p, 'PRESET', 3);
+    addOptional(p, 'ROI_PREFIX', 'networks');
+    addOptional(p, 'OVERWRITE', false);
+    parse(p, varargin{:});
 
-        % Select ROIs
-        roiFilter = cellfun(@(s) startsWith(s, ROI_PREFIX), data.names);
-        roiNames = data.names(roiFilter);
-
-        % Pre-set HC clustering options
-        data.clusters_options = struct('type', 'hc', 'groups', NaN, 'param', 0.05);
-        set(hfig, 'userdata', data);
-
-        conn_displayroi(hfig, [], 'roi.select', [], roiNames);
-        drawnow;
-
-        % Cluster-level inference
-        conn_displayroi(hfig, [], 'fwec.option', PRESET);
-        drawnow;
-
-        % Fix paper size for consistent JPG aspect (1144 x 624)
-        set(hfig, 'PaperPositionMode', 'manual', 'PaperUnits', 'inches', 'PaperPosition', [0 0 11.44 6.24]);
-
-        % Save figure 1: ring
-        ringFig = fullfile(FIGS_DIR, sprintf('%s (ring).jpg', contrast));
-        if ~exist(ringFig, 'file') || OVERWRITE
-            conn_displayroi(hfig, [], 'ring_print', ringFig);
-            drawnow;
-        end
-
-        % Save figure 2: matrix 
-        matFig = fullfile(FIGS_DIR, sprintf('%s (matrix).jpg', contrast));
-        if ~exist(matFig, 'file') || OVERWRITE
-            conn_displayroi(hfig, [], 'matrix_print', matFig);
-            drawnow;
-        end
-
-        % Save figure 3: glass brain projections
-        brainFig = fullfile(FIGS_DIR, sprintf('%s (brain).jpg', contrast));
-        if ~exist(brainFig, 'file') || OVERWRITE
-            conn_displayroi(hfig, [], 'glass_print', brainFig);
-            drawnow;
-        end
-
-        % Save bookmarks 
-        data = get(hfig, 'userdata');
-        bmMat = fullfile(BM_DIR, [contrast, '.mat']);
-
-        if ~exist(bmMat, 'file') || OVERWRITE
-            connArgs = {'displayroi', 'initfile', data.initfile}; 
-            save(bmMat, 'connArgs', '-v7.3');
-    
-            bmFig = fullfile(BM_DIR, [contrast, '.jpg']);
-            conn_print(hfig, bmFig, '-nogui', '-r50', '-nopersistent');
-    
-            bmTxt = fullfile(BM_DIR, [contrast, '.txt']);
-            fid = fopen(bmTxt, 'w');
-            desc = {sprintf('%s | roi prefix = %s | HC | preset %s', contrast, ROI_PREFIX, PRESET_NAME)};
-            for i = 1:numel(desc), fprintf(fid, '%s\n', desc{i}); end
-            fclose(fid);
-        end
-
-        % Save stats CSV 
-        data = get(hfig, 'userdata');
-        statCsv = fullfile(STATS_DIR, [contrast, '.csv']);
-        n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX);
-
-        close all; close all hidden;
-        summary(ic,:) = {contrast, n_clusters, ringFig, matFig, brainFig, statCsv, 'ok'};
+    IP = p.Results.IP;
+    PROJECT = p.Results.PROJECT;
+    PRESET = p.Results.PRESET;
+    ROI_PREFIX = p.Results.ROI_PREFIX;
+    OVERWRITE = p.Results.OVERWRITE;
         
-    catch err
-        fprintf('\r\n%s', err.message);
-        summary(ic,:) = {contrast, NaN, '', '', '', '', ['ERROR: ', err.message]};
+    if IP == 37, ROOT_DIR = '/media/data3/Joanne_SRT_pw/';
+    elseif IP == 23, ROOT_DIR = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
+    else, error('Root directory for this IP address has not yet been defined.'); 
     end
+    
+    PROJ_MAT = fullfile(ROOT_DIR, 'conn_out', [PROJECT, '.mat']);
+    PROJ_DIR = fullfile(ROOT_DIR, 'conn_out', PROJECT);
+
+    ANALYSIS = 'gPPI';
+    ANA2_DIR = fullfile(PROJ_DIR, 'results', 'secondlevel', ANALYSIS);
+    
+    PRESET_NAMES = {'FNC', 'SPC', 'TFCE'};
+    PRESET_NAME  = PRESET_NAMES{PRESET};
+    
+    OUT_DIR   = fullfile(ROOT_DIR, 'reports', PROJECT, ['ROI-', ROI_PREFIX, '_', PRESET_NAME]);
+    FIGS_DIR  = fullfile(OUT_DIR, 'figs');
+    STATS_DIR = fullfile(OUT_DIR, 'stats');
+    BM_DIR    = fullfile(OUT_DIR, 'bookmarks');
+    for fd = {FIGS_DIR, STATS_DIR, BM_DIR}, if ~isfolder(fd{1}), mkdir(fd{1}); end; end
+    
+    assert(exist(PROJ_MAT, 'file'), 'CONN project not exists.');
+    load(PROJ_MAT, 'CONN_x');
+    CONTRASTS = CONN_x.Results.saved.names;
+    
+    % Main ----------------------------------------------------------------
+    
+    summary = cell(numel(CONTRASTS), 7);
+    hdr = {'contrast', 'n_clusters', 'ring_jpg', 'matrix_jpg', 'brain_jpg', 'stats_csv', 'note'};
+    
+    for ic = 1:numel(CONTRASTS)
+        contrast = CONTRASTS{ic};
+        roiMat = fullfile(ANA2_DIR, contrast, 'ROI.mat');
+        n_clusters = NaN; ringFig = ''; matFig = ''; brainFig = ''; statCsv = '';
+        
+        try
+            hfig = conn_displayroi('initfile', roiMat);
+            drawnow;        
+            data = get(hfig, 'userdata');
+    
+            % Select ROIs
+            roiFilter = cellfun(@(s) startsWith(s, ROI_PREFIX), data.names);
+            roiNames = data.names(roiFilter);
+    
+            % Pre-set HC clustering options
+            data.clusters_options = struct('type', 'hc', 'groups', NaN, 'param', 0.05);
+            set(hfig, 'userdata', data);
+    
+            conn_displayroi(hfig, [], 'roi.select', [], roiNames);
+            drawnow;
+    
+            % Cluster-level inference
+            conn_displayroi(hfig, [], 'fwec.option', PRESET);
+            drawnow;
+    
+            % Fix paper size for consistent JPG aspect (1144 x 624)
+            set(hfig, 'PaperPositionMode', 'manual', 'PaperUnits', 'inches', 'PaperPosition', [0 0 11.44 6.24]);
+    
+            % Save figure 1: ring
+            ringFig = fullfile(FIGS_DIR, sprintf('%s (ring).jpg', contrast));
+            if ~exist(ringFig, 'file') || OVERWRITE
+                conn_displayroi(hfig, [], 'ring_print', ringFig);
+                drawnow;
+            end
+    
+            % Save figure 2: matrix 
+            matFig = fullfile(FIGS_DIR, sprintf('%s (matrix).jpg', contrast));
+            if ~exist(matFig, 'file') || OVERWRITE
+                conn_displayroi(hfig, [], 'matrix_print', matFig);
+                drawnow;
+            end
+    
+            % Save figure 3: glass brain projections
+            brainFig = fullfile(FIGS_DIR, sprintf('%s (brain).jpg', contrast));
+            if ~exist(brainFig, 'file') || OVERWRITE
+                conn_displayroi(hfig, [], 'glass_print', brainFig);
+                drawnow;
+            end
+    
+            % Save bookmarks 
+            data = get(hfig, 'userdata');
+            bmMat = fullfile(BM_DIR, [contrast, '.mat']);
+    
+            if ~exist(bmMat, 'file') || OVERWRITE
+                connArgs = {'displayroi', 'initfile', data.initfile}; 
+                save(bmMat, 'connArgs', '-v7.3');
+        
+                bmFig = fullfile(BM_DIR, [contrast, '.jpg']);
+                conn_print(hfig, bmFig, '-nogui', '-r50', '-nopersistent');
+        
+                bmTxt = fullfile(BM_DIR, [contrast, '.txt']);
+                fid = fopen(bmTxt, 'w');
+                desc = {sprintf('%s | roi prefix = %s | HC | preset %s', contrast, ROI_PREFIX, PRESET_NAME)};
+                for i = 1:numel(desc), fprintf(fid, '%s\n', desc{i}); end
+                fclose(fid);
+            end
+    
+            % Save stats CSV 
+            data = get(hfig, 'userdata');
+            statCsv = fullfile(STATS_DIR, [contrast, '.csv']);
+            n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX);
+    
+            close all; close all hidden;
+            status = 'ok';
+            
+        catch err
+            fprintf('\r\n%s', err.message);
+            status = ['ERROR: ', err.message];
+        end
+    
+        summary(ic, :) = {contrast, n_clusters, ringFig, matFig, brainFig, statCsv, status};
+    end
+    
+    % Summary CSV
+    summCsv = fullfile(OUT_DIR, 'summary.csv');
+    summTbl = array2table(summary, 'VariableNames', hdr);
+    writetable(summTbl, summCsv);
 end
 
-% Summary CSV
-summCsv = fullfile(OUT_DIR, 'summary.csv');
-summTbl = array2table(summary, 'VariableNames', hdr);
-writetable(summTbl, summCsv);
-
-%% Functions
+%% Other functions
 
 function n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX)
 % Write structured CSV from data.list2txt.
@@ -158,7 +170,7 @@ function n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX)
             n_clusters = n_clusters + 1;
 
         else
-            parts = regexp(row, '(\\.*\\)\s+(.*\s*=\s*[\d.]+)\s+([\d.]+)\s+([\d.]+)', 'tokens', 'once');
+            parts = regexp(row, '(\\.*\\)\s+(.*\s*=\s*-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)', 'tokens', 'once');
             part1s = split(parts{1}, '\\');
             roi1 = replace(part1s{3}, ',', ' ');
             roi1 = replace(roi1, [ROI_PREFIX, '.'], '');
