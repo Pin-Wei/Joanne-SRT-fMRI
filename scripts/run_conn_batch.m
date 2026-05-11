@@ -70,7 +70,7 @@ function run_conn_batch(varargin)
     CONTRASTS(i+3).between_conditions_names = {'swi_r3', 'swi_r4', 'swi_r5', 'swi_r6', 'random'};
     CONTRASTS(i+3).between_conditions_contrast = [1 1 1 1 -4];
     
-    % stable ------------------------------------------------------------------
+    % stable --------------------------------------------------------------
     
     if IP == 37
         rootDir = '/media/data3/Joanne_SRT_pw/';
