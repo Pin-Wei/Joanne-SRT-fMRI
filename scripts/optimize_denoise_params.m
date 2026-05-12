@@ -205,7 +205,7 @@ function optimize_denoise_params(varargin)
 
         R(rowIdx, :) = [col1, 2, ...
             bestPoly, BP_LO, bestBp2, bestSim, bestM24, acomp, aroma, bestGmr, ...
-            dv, dq, ds, mean_qc, elapsed, status];
+            dv, dq, ds, mean_qc, elapsed];
 
         S{rowIdx} = status;
     end
