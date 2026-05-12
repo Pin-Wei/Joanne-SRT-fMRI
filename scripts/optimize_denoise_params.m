@@ -74,11 +74,11 @@ function optimize_denoise_params(varargin)
     logFID = fopen(logFile, 'a'); 
     
     t = datetime('now', 'Format', 'MMMM d, yyyy h:mm a'); 
-    fprintf(logFID, '\r\n======================== %s ========================', t);
+    write_log(logFID, '\r\n======================== %s ========================', t);
     
     [~, fn, ~] = fileparts(batchFile);
-    fprintf(logFID, '\r\nRun optimization on "%s"', fn);
-    fprintf(logFID, '\r\n');
+    write_log(logFID, 'Run optimization on "%s"', fn);
+    write_log(logFID, '');
 
     [prevKeys, prevT] = load_prior_results(PREV_XLS, requiredCols, logFID);
     write_log(logFID, '%d tested parameter combinations are loaded.', height(prevT));
@@ -96,7 +96,7 @@ function optimize_denoise_params(varargin)
     );
     grid = [g1(:), g2(:), g3(:), g4(:), g5(:), g6(:), g7(:)];
 
-    write_log(logFID, '\r\n');
+    write_log(logFID, '');
     write_log(logFID, 'Stage 1 starts');
     
     t0 = tic;
@@ -124,6 +124,7 @@ function optimize_denoise_params(varargin)
             else, bp = [BP_LO, bpHi]; 
             end
 
+            fprintf('\r\n');
             [dv, dq, ds, mean_qc, elapsed, status] = run_one_combi( ...
                 origPreproc, poly, bp, sim, m24, acomp, aroma, gmr, qcVars);
 
@@ -165,7 +166,7 @@ function optimize_denoise_params(varargin)
     );
     grid2 = [g1(:), g2(:)];
     
-    write_log(logFID, '\r\n');
+    write_log(logFID, '');
     write_log(logFID, 'Stage 2 starts');
     
     t0 = tic;
@@ -182,7 +183,7 @@ function optimize_denoise_params(varargin)
         if isKey(prevKeys, key)
             try
                 [dv, dq, ds, mean_qc] = find_prior_results( ...
-                    prevT, bestPoly, BP_LO, estBp2, bestSim, bestM24, acomp, aroma, bestGmr);
+                    prevT, bestPoly, BP_LO, bestBp2, bestSim, bestM24, acomp, aroma, bestGmr);
 
                 status = 'Prev';
 
@@ -195,6 +196,7 @@ function optimize_denoise_params(varargin)
             else, bestBp = [BP_LO, bestBp2]; 
             end
 
+            fprintf('\r\n');
             [dv, dq, ds, mean_qc, elapsed, status] = run_one_combi( ...
                 origPreproc, bestPoly, bestBp, bestSim, bestM24, acomp, aroma, bestGmr, qcVars);
         
@@ -389,7 +391,7 @@ end
 function write_log(fid, fmt, varargin)
     msg  = sprintf(fmt, varargin{:});
     t = datetime('now', 'Format', 'yyyy-MM-dd HH:mm:SS');
-    line = sprintf('\r\n[%s] %s', t, msg);
+    line = sprintf('[%s] %s\r\n', t, msg);
     fprintf('%s', line);
     if fid > 0, fprintf(fid, '%s', line); end
 end
