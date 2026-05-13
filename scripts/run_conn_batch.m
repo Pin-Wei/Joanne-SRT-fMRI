@@ -5,7 +5,7 @@ function run_conn_batch(varargin)
     
     p = inputParser;
     addOptional(p, 'IP', 23);
-    addOptional(p, 'PROJECT', no_PM_260506);
+    addOptional(p, 'PROJECT', 'no_PM_260512');
     parse(p, varargin{:});
 
     IP = p.Results.IP;
@@ -44,6 +44,9 @@ function run_conn_batch(varargin)
     
     % Name of analysis 
     ANALYSIS_NAME = 'gPPI';
+
+    % ROI names (seeds)
+    % ANA_SOURCES = {'networks'};
     
     % Between-subject factors
     BS_EFFECT_NAMES = {'AllSubjects', 'ExcludeOutlierSubjects'};
@@ -95,9 +98,13 @@ function run_conn_batch(varargin)
     TR       = 2.0; 
     SPACE    = 'MNI152NLin2009cAsym';
     
-    ROI_NAMES = {'atlas', 'networks'}; 
-    ROI_FILES = {fullfile(connDir, 'rois', 'atlas.nii'), ...
-                 fullfile(connDir, 'rois', 'networks.nii')}; 
+    ROI_NAMES = {'atlas', 'networks', 'FS', 'BA'}; 
+    ROI_FILES = { ...
+        fullfile(connDir, 'rois', 'atlas.nii'), ...
+        fullfile(connDir, 'rois', 'networks.nii'), ...
+        fullfile(rootDir, 'data', 'meta', 'FS_atlas.nii'), ...
+        fullfile(rootDir, 'data', 'meta', 'Brodmann_atlas.nii') ...
+    }; 
     
     % Start logging -------------------------------------------------------
     
@@ -309,10 +316,11 @@ function run_conn_batch(varargin)
             conn_batch( ...
                 'filename', batchFile, ...
                 'Analysis.name', ANALYSIS_NAME, ...
-                'Analysis.measure', 3, ...     % regression (bivariate)
-                'Analysis.modulation', 1, ...  % gPPI interaction effect
+                'Analysis.measure', 3, ...        % regression (bivariate)
+                'Analysis.modulation', 1, ...     % gPPI interaction effect
                 'Analysis.conditions', COND_NAMES, ... 
-                'Analysis.type', 3, ...        % ROI-to-ROI & Seed-to-Voxel
+                'Analysis.type', 3, ...           % ROI-to-ROI & Seed-to-Voxel
+                ... % 'Analysis.sources', ANA_SOURCES, ...
                 'Analysis.done', 1, ...
                 'Analysis.overwrite', 1 ...
             );

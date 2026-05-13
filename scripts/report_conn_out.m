@@ -5,18 +5,18 @@ function report_conn_out(varargin)
     
     p = inputParser;
     addOptional(p, 'IP', 23);
-    addOptional(p, 'PROJECT', 'no_PM_260504');
+    addOptional(p, 'PROJECT', 'no_PM_260512');
     addOptional(p, 'PRESET', 3);
-    addOptional(p, 'ROI_PREFIX', 'networks');
+    addOptional(p, 'ROI', 3);
     addOptional(p, 'OVERWRITE', false);
     parse(p, varargin{:});
 
     IP = p.Results.IP;
     PROJECT = p.Results.PROJECT;
     PRESET = p.Results.PRESET;
-    ROI_PREFIX = p.Results.ROI_PREFIX;
+    ROI = p.Results.ROI;
     OVERWRITE = p.Results.OVERWRITE;
-        
+
     if IP == 37, ROOT_DIR = '/media/data3/Joanne_SRT_pw/';
     elseif IP == 23, ROOT_DIR = '/home/aclexp/pinwei/Joanne_SRT_fMRI/'; 
     else, error('Root directory for this IP address has not yet been defined.'); 
@@ -28,6 +28,9 @@ function report_conn_out(varargin)
     ANALYSIS = 'gPPI';
     ANA2_DIR = fullfile(PROJ_DIR, 'results', 'secondlevel', ANALYSIS);
     
+    ROI_PREFIXS = {'atlas', 'networks', 'joanne'};
+    ROI_PREFIX = ROI_PREFIXS{ROI};
+
     PRESET_NAMES = {'FNC', 'SPC', 'TFCE'};
     PRESET_NAME  = PRESET_NAMES{PRESET};
     
@@ -57,7 +60,7 @@ function report_conn_out(varargin)
             data = get(hfig, 'userdata');
     
             % Select ROIs
-            roiFilter = cellfun(@(s) startsWith(s, ROI_PREFIX), data.names);
+            roiFilter = make_roi_filter(roiNames, ROI_PREFIX);
             roiNames = data.names(roiFilter);
     
             % Pre-set HC clustering options
@@ -173,9 +176,9 @@ function n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX)
             parts = regexp(row, '(\\.*\\)\s+(.*\s*=\s*-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)', 'tokens', 'once');
             part1s = split(parts{1}, '\\');
             roi1 = replace(part1s{3}, ',', ' ');
-            roi1 = replace(roi1, [ROI_PREFIX, '.'], '');
+            roi1 = rename_roi(roi1, ROI_PREFIX);
             roi2 = replace(part1s{6}, ',', ' ');
-            roi2 = replace(roi2, [ROI_PREFIX, '.'], '');
+            roi2 = rename_roi(roi2, ROI_PREFIX);
             statRes = strtrim(parts{2});
             pUnc = strtrim(parts{3});
             pFDR = strtrim(parts{4});
@@ -187,4 +190,53 @@ function n_clusters = write_stats_csv(data, statCsv, ROI_PREFIX)
     end
 
     fclose(fid);
+end
+
+function roiFilter = make_roi_filter(roiNames, ROI_PREFIX)
+    if matches(ROI_PREFIX, 'joanne')
+        roiSetFS = { ...
+            'precentral', ...       % SL system
+            'Caudate', ...          % SL system
+            'Putamen', ...          % SL system
+            'Cerebellum', ...       % SL system
+            'inferiorparietal', ... % IF system
+            'superiorparietal', ... % IF system
+            'insula', ...           % IF system
+            'CC_Anterior', ...      % IF system
+            'Amygdala', ...         % IF system
+            'Thalamus' ...          % IF system
+        };
+        roiSetBA = { ...
+            'BA6', ... % supplementary motor area (SMA); SL system
+            'BA4', ... % primary motor cortex (M1); SL system
+            'BA4' ...  % dorsolateral prefrontal cortex (dlPFC); IF system
+        };
+        roiFilter = cellfun(@(s) ...
+            startsWith(s, 'FS') && any(contains(roiSetFS, s)) || ...
+            startsWith(s, 'BA') && any(contains(roiSetBA, s)), ...
+            roiNames ...
+        );
+    else
+        roiFilter = cellfun(@(s) startsWith(s, ROI_PREFIX), roiNames);
+    end
+end
+
+function roi = rename_roi(roi, ROI_PREFIX)
+    if matches(ROI_PREFIX, 'joanne')
+        roi = replace(roi, ...
+            ["ctx-rh-", "R "], ...
+            ["ctx-lh-", "L "], ...
+            ["BA6", "SMA (Supplementary Motor Area)"], ...
+            ["BA4", "M1 (Primary Motor Cortex)"], ...
+            ["BA4", "dlPFC (DorsoLateral Prefrontal Cortex)"], ...
+            ["precentral", "PreCG (Precentral Gyrus)"], ...
+            ["inferiorparietal", "IPL (Inferior Parietal Lobule)"], ...
+            ["superiorparietal", "SPL (Superior Parietal Lobule)"], ...
+            ["insula", "Insula"], ...
+            ["CC_Anterior", "ACC (Anterior Cingulate Cortex)"], ...
+            ["-", " "] ...
+        );
+    else
+        roi = replace(roi, [ROI_PREFIX, '.'], ' ');
+    end
 end

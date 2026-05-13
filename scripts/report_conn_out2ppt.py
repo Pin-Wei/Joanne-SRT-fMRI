@@ -302,7 +302,7 @@ def get_denoising_params(mat_file):
     mot_idx = np.where(confound_names == "realignment")[0][0]
     acomp_idx = np.where(confound_names == "aCompCor")[0][0]
     aroma_idx = np.where(confound_names == "aroma")[0][0]
-    gmr_idx = np.where(confound_names == "Gray Matter")[0]
+    gmr_idx = np.where(confound_names == "Grey Matter")[0]
 
     return {
         "POLY_ORD": data["CONN_x"]["Preproc"]["detrending"],
