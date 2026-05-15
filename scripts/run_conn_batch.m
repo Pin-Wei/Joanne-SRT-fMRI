@@ -5,7 +5,7 @@ function run_conn_batch(varargin)
     
     p = inputParser;
     addOptional(p, 'IP', 23);
-    addOptional(p, 'PROJECT', 'no_PM_260512');
+    addRequired(p, 'PROJECT');
     parse(p, varargin{:});
 
     IP = p.Results.IP;
@@ -20,19 +20,16 @@ function run_conn_batch(varargin)
     N_AROMA  = 10;           % number of ICA-AROMA components
     RM_GMR   = true;         % remove the average signal within the grey matter (GM) mask
     
-    % Conditions
-    COND_OF_INTEREST = [ ...
-        "str_fst_r1", "str_fst_r2", "str_fst_r3", "str_fst_r4", "str_fst_r5", "str_fst_r6", ... 
-        "str_snd_r3", "str_snd_r4", "str_snd_r5", "str_snd_r6", "str_snd_r7", "str_snd_r8", ... 
-        "swi_r3", "swi_r4", "swi_r5" "swi_r6" ... 
-    ];
+    % Conditions and Contrasts
+    [COND_OF_INTEREST, CONTRASTS] = define_for_version(PROJECT);
+
     COND_NAMES = ["random", COND_OF_INTEREST, "incorrect"];
     N_CONDS = numel(COND_NAMES);
     
     % Covariates
     COVAR_NAMES = {'realignment', 'fd', 'scrubbing', 'aCompCor', 'aroma'};
     N_COVARS = numel(COVAR_NAMES);
-    
+
     L2_COVARS = {'QC_MeanMotion', 'QC_InvalidScans'};
     
     % Confounds
@@ -44,37 +41,19 @@ function run_conn_batch(varargin)
     
     % Name of analysis 
     ANALYSIS_NAME = 'gPPI';
-
-    % ROI names (seeds)
-    % ANA_SOURCES = {'networks'};
     
     % Between-subject factors
     BS_EFFECT_NAMES = {'AllSubjects', 'ExcludeOutlierSubjects'};
     BS_CONTRAST = [1 0];
     
-    % Contrasts
-    CONTRASTS = struct(); 
-    for i = 1:numel(COND_OF_INTEREST)
-        cond = COND_OF_INTEREST(i);
-        CONTRASTS(i).saveas = strcat(cond, '_ran');
-        CONTRASTS(i).between_conditions_names = {cond, 'random'};
-        CONTRASTS(i).between_conditions_contrast = [1 -1];
-    end
-    
-    CONTRASTS(i+1).saveas = 'str_fst';
-    CONTRASTS(i+1).between_conditions_names = {'str_fst_r1', 'str_fst_r2', 'str_fst_r3', 'str_fst_r4', 'str_fst_r5', 'str_fst_r6', 'random'};
-    CONTRASTS(i+1).between_conditions_contrast = [1 1 1 1 1 1 -6];
-    
-    CONTRASTS(i+2).saveas = 'str_snd';
-    CONTRASTS(i+2).between_conditions_names = {'str_snd_r3', 'str_snd_r4', 'str_snd_r5', 'str_snd_r6', 'str_snd_r7', 'str_snd_r8', 'random'};
-    CONTRASTS(i+2).between_conditions_contrast = [1 1 1 1 1 1 -6];
-    
-    CONTRASTS(i+3).saveas = 'switch';
-    CONTRASTS(i+3).between_conditions_names = {'swi_r3', 'swi_r4', 'swi_r5', 'swi_r6', 'random'};
-    CONTRASTS(i+3).between_conditions_contrast = [1 1 1 1 -4];
-    
-    % stable --------------------------------------------------------------
-    
+    % Fixed information
+    SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
+    N_SUBJS  = length(SID_LIST);
+    N_RUNS   = 8; 
+    TR       = 2.0; 
+    SPACE    = 'MNI152NLin2009cAsym';
+
+    % Paths 
     if IP == 37
         rootDir = '/media/data3/Joanne_SRT_pw/';
         connDir = '/home/aclexp/mytools/matlab/conn';
@@ -92,12 +71,7 @@ function run_conn_batch(varargin)
     [fd, ~, ~] = fileparts(logFile);
     if ~isfolder(fd), mkdir(fd); end
     
-    SID_LIST = [1, 2, 4, 6, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
-    N_SUBJS  = length(SID_LIST);
-    N_RUNS   = 8; 
-    TR       = 2.0; 
-    SPACE    = 'MNI152NLin2009cAsym';
-    
+    % Atlases
     ROI_NAMES = {'atlas', 'networks', 'FS', 'BA'}; 
     ROI_FILES = { ...
         fullfile(connDir, 'rois', 'atlas.nii'), ...
@@ -377,6 +351,69 @@ function run_conn_batch(varargin)
 end
 
 %% Other functions
+
+function [COND_OF_INTEREST, CONTRASTS] = define_for_version(PROJECT)
+    if matches(PROJECT, {'no_PM_260504', 'no_PM_260515'})
+        COND_OF_INTEREST = [ ...
+            "str_r12", "str_r34", "str_r56", "str_r78", ... % "structured"
+            "swi_r34", "swi_r56" ... % "switch"
+        ];
+        CONTRASTS = init_contrast(COND_OF_INTEREST);
+        CONTRASTS = add_contrast(CONTRASTS, ...
+            'str_main', ...
+            {'str_r12', 'str_r34', 'str_r56', 'str_r78', 'random'}, ...
+            [1 1 1 1 -4] ...
+        );
+        CONTRASTS = add_contrast(CONTRASTS, ...
+            'swi_main', ...
+            {'swi_r34', 'swi_r56', 'random'}, ...
+            [1 1 -2] ...
+        );
+
+    elseif matches(PROJECT, {'no_PM_260506', 'no_PM_260512'})
+        COND_OF_INTEREST = [ ...
+            "str_fst_r1", "str_fst_r2", "str_fst_r3", "str_fst_r4", "str_fst_r5", "str_fst_r6", ... 
+            "str_snd_r3", "str_snd_r4", "str_snd_r5", "str_snd_r6", "str_snd_r7", "str_snd_r8", ... 
+            "swi_r3", "swi_r4", "swi_r5", "swi_r6" ... 
+        ];
+        CONTRASTS = init_contrast(COND_OF_INTEREST);
+        CONTRASTS = add_contrast(CONTRASTS, ...
+            'str_fst', ...
+            {'str_fst_r1', 'str_fst_r2', 'str_fst_r3', ...
+             'str_fst_r4', 'str_fst_r5', 'str_fst_r6', 'random'}, ...
+            [1 1 1 1 1 1 -6] ...
+        );
+        CONTRASTS = add_contrast(CONTRASTS, ...
+            'str_snd', ...
+            {'str_snd_r3', 'str_snd_r4', 'str_snd_r5', ...
+             'str_snd_r6', 'str_snd_r7', 'str_snd_r8', 'random'}, ...
+            [1 1 1 1 1 1 -6] ...
+        ); 
+        CONTRASTS = add_contrast(CONTRASTS, ...
+            'switch', ...
+            {'swi_r3', 'swi_r4', 'swi_r5', 'swi_r6', 'random'}, ...
+            [1 1 1 1 -4] ...
+        ); 
+    else
+        error("Error! Project not defined.")
+    end
+end
+
+function CONTRASTS = init_contrast(COND_OF_INTEREST)
+    CONTRASTS = struct(); 
+    for i = 1:numel(COND_OF_INTEREST)
+        cond = COND_OF_INTEREST(i);
+        CONTRASTS(i).saveas = strcat(cond, '_ran');
+        CONTRASTS(i).between_conditions_names = {cond, 'random'};
+        CONTRASTS(i).between_conditions_contrast = [1 -1];
+    end
+end
+
+function CONTRASTS = add_contrast(CONTRASTS, name, conds, weights)
+    CONTRASTS(end+1).saveas = name;
+    CONTRASTS(end).between_conditions_names = conds;
+    CONTRASTS(end).between_conditions_contrast = weights;
+end
 
 function [onsets, durations] = cond_setter(condName, irun, subj, bidsDir)
     onsets = []; durations = []; 
