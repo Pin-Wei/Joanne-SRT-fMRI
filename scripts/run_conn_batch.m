@@ -259,7 +259,7 @@ function run_conn_batch(varargin)
     
         t0 = tic;
         conn_batch(batch);
-        write_log(logFID, '\r\n--- Finished initial setup + denoising (Elapsed time: %.1f min) ---', toc(t0)/60);
+        write_log(logFID, '\r\n--- Finished initial setup + denoising (Elapsed time: %s) ---', format_time(toc(t0)));
         write_log(logFID, '\r\n');
     end
     
@@ -291,7 +291,7 @@ function run_conn_batch(varargin)
             write_log(logFID, '\r\nData Sensitivity score: %.4f', s3);
             write_log(logFID, '\r\nMean QC score         : %.4f', mean_qc);
             write_log(logFID, '\r\n');
-            write_log(logFID, '\r\n--- Finished QC scores calculation (Elapsed time: %.1f sec) ---', toc(t0));
+            write_log(logFID, '\r\n--- Finished QC scores calculation (Elapsed time: %s) ---', format_time(toc(t0)));
             write_log(logFID, '\r\n');
         end
     catch err
@@ -325,7 +325,7 @@ function run_conn_batch(varargin)
                 'Analysis.overwrite', 1 ...
             );
             conn save; 
-            write_log(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+            write_log(logFID, '\r\n--- Done (Elapsed time: %s) ---', format_time(toc(t0)));
             write_log(logFID, '\r\n');
     
         catch err
@@ -361,7 +361,7 @@ function run_conn_batch(varargin)
                     'Results.display', 0, ...
                     'Results.done', 1 ...
                 );
-                write_log(logFID, '\r\n--- Done (Elapsed time: %.1f min) ---', toc(t0)/60);
+                write_log(logFID, '\r\n--- Done (Elapsed time: %s) ---', format_time(toc(t0)));
                 write_log(logFID, '\r\n');
     
             catch err
@@ -426,5 +426,20 @@ end
 function str = log2str(a)
     if a, str = 'true'; 
     else, str = 'false'; 
+    end
+end
+
+function str = format_time(t)
+    if t/360 > 0
+        hr = floor(t / 360);
+        min = floor(mod(t, 60) / 60);
+        sec = mod(t, 360);
+        str = sprintf('%d hr %d min %.1f sec', hr, min, sec);
+    elseif t/60 > 0
+        min = floor(t / 60);
+        sec = mod(t, 360);
+        str = sprintf('%d min %.1f sec', min, sec);
+    else
+        str = sprintf('%.1f sec', t);
     end
 end

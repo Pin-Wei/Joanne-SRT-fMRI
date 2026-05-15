@@ -24,7 +24,14 @@ function optimize_denoise_params(varargin)
     N_AROMA_COARSE = [0, 999];
     RM_GMR_OPTS    = [1, 0];                        % whether to remove the average signal within the grey matter (GM) mask
     
-    MAX_ROWS = 5000;
+    MAX_ROWS = ... % to pre-allocate memory
+        numel(POLY_ORD_OPTS) * ...
+        numel(BP_HI_OPTS) * ...
+        numel(SIMULT_OPTS) * ...
+        numel(MOT24_OPTS) * ...
+        numel(N_ACOMP_OPTS) * ...
+        numel(N_AROMA_OPTS) * ...
+        numel(RM_GMR_OPTS); 
 
     % Paths ---------------------------------------------------------------
     
@@ -55,7 +62,7 @@ function optimize_denoise_params(varargin)
     scoreColumns = {'Validity', 'Quality', 'Sensitivity', 'Mean_QC'};
     requiredCols = [paramColumns, scoreColumns];
     resultColumns = [{'Iter'}, {'Stage'}, requiredCols, {'Runtime_s'},];
-    R = nan(MAX_ROWS, numel(resultColumns)); % pre-allocate memory
+    R = nan(MAX_ROWS, numel(resultColumns)); 
     S = cell(MAX_ROWS, 1);
     
     scoreIdx = find(strcmp(resultColumns, 'Mean_QC'), 1);
@@ -66,6 +73,9 @@ function optimize_denoise_params(varargin)
     acompIdx = find(strcmp(resultColumns, 'N_ACOMP'), 1);
     aromaIdx = find(strcmp(resultColumns, 'N_AROMA'), 1);
     gmrIdx   = find(strcmp(resultColumns, 'RM_GMR'), 1);
+    dvIdx    = find(strcmp(resultColumns, 'Validity'), 1);
+    dqIdx    = find(strcmp(resultColumns, 'Quality'), 1);
+    dsIdx    = find(strcmp(resultColumns, 'Sensitivity'), 1);
     
     iter = 0; % running counter
     
@@ -154,10 +164,15 @@ function optimize_denoise_params(varargin)
     bestAcomp = R(bestIdx, acompIdx);
     bestAroma = R(bestIdx, aromaIdx);
     bestGmr   = R(bestIdx, gmrIdx);
+    bestDV    = R(bestIdx, dvIdx);
+    bestDQ    = R(bestIdx, dqIdx);
+    bestDS    = R(bestIdx, dsIdx);
     
     write_log(logFID, 'Best iter (%d): POLY=%d  BP=[%.3f, %.3g]  SIM=%s  M24=%s  ACOMP=%d  AROMA=%g  GMR=%s', ...
         bestIdx, bestPoly, BP_LO, bestBp2, log2str(bestSim), log2str(bestM24), bestAcomp, bestAroma, log2str(bestGmr));
     
+    write_log(logFID, 'DV=%.4f DQ=%.4f DS=%.4f', bestDV, bestDQ, bestDS);
+
     % Stage 2: fine grid around winner ------------------------------------
     
     [g1, g2] = ndgrid( ...
@@ -172,7 +187,7 @@ function optimize_denoise_params(varargin)
     t0 = tic;
     for ic = 1:size(grid2, 1)
         rowIdx = offset + ic;
-        dv = NaN; dq = NaN; ds = NaN; mean_qc = NaN; col1 = NaN; elapsed = NaN;
+        col1 = NaN; elapsed = NaN;
 
         acomp = N_ACOMP_OPTS(grid2(ic, 1));
         aroma = N_AROMA_OPTS(grid2(ic, 2));
@@ -188,7 +203,7 @@ function optimize_denoise_params(varargin)
                 status = 'Prev';
 
             catch err
-                status = ['FAIL: ', strrep(err.message, newline, ' ')];
+                continue % has been tested in stage 1
             end
 
         else
@@ -222,7 +237,14 @@ function optimize_denoise_params(varargin)
     
     [~, sort_idx] = sort(T.Mean_QC, 'descend', 'MissingPlacement', 'last');
     T = T(sort_idx, :);
-    
+
+    write_log(logFID, 'Best iter (%d): POLY=%d  BP=[%.3f, %.3g]  SIM=%s  M24=%s  ACOMP=%d  AROMA=%g  GMR=%s', ...
+        T.Iter(1), T.POLY_ORD(1), T.BP_LO(1), T.BP_HI(1), log2str(T.SIMULT(1)), ...
+        log2str(T.MOT24(1)), T.N_ACOMP(1), T.N_AROMA(1), log2str(T.RM_GMR(1)));
+
+    write_log(logFID, 'DV=%.4f DQ=%.4f DS=%.4f', ...
+        T.Validity(1), T.Quality(1), T.Sensitivity(1));
+
     writetable(T, xlsFile);
 end
 
@@ -271,10 +293,8 @@ function [prevKeys, prevT] = load_prior_results(PREV_XLS, requiredCols, logFID)
         write_log(logFID, 'Loading %d results from "%s"', height(T), fp);
 
         if(isempty(prevT))
-            nPrev = 0;
             prevT = T(:, requiredCols);
         else
-            nPrev = height(prevT);
             prevT = [prevT(:, requiredCols); T(:, requiredCols)];
             prevT = unique(prevT(:, requiredCols), 'stable');
         end

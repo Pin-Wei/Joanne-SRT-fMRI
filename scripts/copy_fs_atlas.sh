@@ -16,7 +16,7 @@ IP=$1
 
 ATLAS_FILES=( \
 	"FS.afni.MNI2009c_asym.nii.gz" \
-	"Brodmann.nii.gz" \
+	"Brodmann_pijn_afni.nii.gz" \
 )
 ATLAS_NAMES=( \
 	"FS_atlas" \
