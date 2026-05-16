@@ -316,6 +316,7 @@ function run_conn_batch(varargin)
     for i = 1:numel(CONTRASTS)
         C = CONTRASTS(i);
         
+        % if isfolder(fullfile(rootDir, 'conn_out', PROJECT, 'results', 'secondlevel', ANALYSIS_NAME, C.saveas)) 
         if any(matches(CONN_x.Results.saved.names, C.saveas))
             write_log(logFID, '\r\nContrast "%s" may has been analyzed. Skipping ...', C.saveas);
             write_log(logFID, '\r\n');
@@ -335,6 +336,7 @@ function run_conn_batch(varargin)
                     'Results.display', 0, ...
                     'Results.done', 1 ...
                 );
+                conn save; 
                 write_log(logFID, '\r\n--- Done (Elapsed time: %s) ---', format_time(toc(t0)));
                 write_log(logFID, '\r\n');
     

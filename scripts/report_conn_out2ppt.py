@@ -150,7 +150,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--project", type=str, required=True, 
                         help="Name of the CONN project.")
-    parser.add_argument("-r", "--roi_prefix", type=str, default="networks", 
+    parser.add_argument("-r", "--roi_prefix", type=str, default=["networks", "joanne"][1], 
                         help="Prefix of the ROI names used to generate the report.")
     parser.add_argument("-i", "--preset", type=int, choices=[1, 2, 3], default=3,
                         help="Inference preset used to generate the report. (1: FNC, 2: SPC, 3: TFCE)")
