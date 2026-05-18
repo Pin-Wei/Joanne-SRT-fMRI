@@ -1,26 +1,36 @@
 #!/usr/bin/env bash
 set -e
 
-# Copy AFNI-distributed Freesurfer atlases to local folder (../data/meta/)
-# Usage: bash copy_fs_atlas.sh $IP
+# Copy AFNI-distributed atlases to local folder (../data/meta/)
+# Usage: bash copy_afni_atlas.sh $IP
 #
 # 1. Freesurfer MNI2009c Desikan-Killiany (DK) parcellation
 #	 - see also: /usr/local/freesurfer/FreeSurferColorLUT.txt
 #
-# 2. Brodmann atlas MNI N27 - Pijnenburg
-#    - Pijnenburg, R., et al (2021). Myelo- and cytoarchitectonic microstructural 
-#      and functional human cortical atlases reconstructed in common MRI space. 
+# 2. Brodmann-Pijnenburg atlas MNI 2009c 
+#    - Pijnenburg, R., et al (2021). 
+#      Myelo- and cytoarchitectonic microstructural and functional human cortical 
+#      atlases reconstructed in common MRI space. 
 #      NeuroImage, 239, 118274.
+# 
+# 3. JulichBrain 3.0 for MNI 2009c asymmetric space
+#    - Amunts, K, Mohlberg, H, Bludau, S, & Zilles, K (2020).
+#      Julich-Brain: A 3D probabilistic atlas of the human brain's cytoarchitecture.
+#      Science, 369(6506), 988992.
+#
+# see all available atlases in file: AFNI_atlas_spaces.niml
 	
 IP=$1
 
 ATLAS_FILES=( \
 	"FS.afni.MNI2009c_asym.nii.gz" \
 	"Brodmann_pijn_afni.nii.gz" \
+	"Julich_MNI2009c.nii.gz" \
 )
 ATLAS_NAMES=( \
 	"FS_atlas" \
 	"Brodmann_atlas" \
+	"Julich_atlas" \
 )
 TEMP_FILE="label_table.txt"
 
