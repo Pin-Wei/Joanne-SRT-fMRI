@@ -4,8 +4,8 @@ function run_conn_batch(varargin)
     % Configuration -------------------------------------------------------
     
     p = inputParser;
-    addOptional(p, 'IP', 23);
-    addRequired(p, 'PROJECT');
+    addRequired(p, 'IP', @(x) any(x == [23, 37])); % positional arguments
+    addRequired(p, 'PROJECT', @ischar);
     parse(p, varargin{:});
 
     IP = p.Results.IP;
@@ -316,8 +316,8 @@ function run_conn_batch(varargin)
     for i = 1:numel(CONTRASTS)
         C = CONTRASTS(i);
         
-        % if isfolder(fullfile(rootDir, 'conn_out', PROJECT, 'results', 'secondlevel', ANALYSIS_NAME, C.saveas)) 
-        if any(matches(CONN_x.Results.saved.names, C.saveas))
+        if isfolder(fullfile(CONN_x.folders.secondlevel, ANALYSIS_NAME, C.saveas))
+        % if any(matches(CONN_x.Results.saved.names, C.saveas))
             write_log(logFID, '\r\nContrast "%s" may has been analyzed. Skipping ...', C.saveas);
             write_log(logFID, '\r\n');
         else
@@ -355,7 +355,7 @@ end
 %% Other functions
 
 function [COND_OF_INTEREST, CONTRASTS] = define_for_version(PROJECT)
-    if matches(PROJECT, {'no_PM_260504', 'no_PM_260515'})
+    if ismember(PROJECT, {'no_PM_260504', 'no_PM_260515'})
         COND_OF_INTEREST = [ ...
             "str_r12", "str_r34", "str_r56", "str_r78", ... % "structured"
             "swi_r34", "swi_r56" ... % "switch"
@@ -372,7 +372,7 @@ function [COND_OF_INTEREST, CONTRASTS] = define_for_version(PROJECT)
             [1 1 -2] ...
         );
 
-    elseif matches(PROJECT, {'no_PM_260506', 'no_PM_260512'})
+    elseif ismember(PROJECT, {'no_PM_260506', 'no_PM_260512'})
         COND_OF_INTEREST = [ ...
             "str_fst_r1", "str_fst_r2", "str_fst_r3", "str_fst_r4", "str_fst_r5", "str_fst_r6", ... 
             "str_snd_r3", "str_snd_r4", "str_snd_r5", "str_snd_r6", "str_snd_r7", "str_snd_r8", ... 
