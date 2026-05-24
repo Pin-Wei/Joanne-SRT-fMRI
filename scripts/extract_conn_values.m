@@ -69,7 +69,7 @@ function extract_conn_values(varargin)
             % fprintf("subj: %s\n", mat2str(size(subjNames(subjIdxs(:)))));
             % fprintf("y: %s\n", mat2str(size(y(:))));
 
-            tbl = table( ...
+            T = [T; table( ...
                 repmat({contrast}, n, 1), ...
                 condNames(condIdxs(:)).', ...
                 repmat({roiNames(iroi)}, n, 1), ...
@@ -84,8 +84,7 @@ function extract_conn_values(varargin)
                     'subject', ...
                     'value' ...
                 } ...
-            );
-            T = [T; tbl];
+            )];
         end
     end
 
@@ -102,7 +101,7 @@ end
 function CONTRASTS = define_for_version(PROJECT)
     if ismember(PROJECT, {'no_PM_260504', 'no_PM_260515'})
         CONTRASTS = {'str_main', 'swi_main'};
-    elseif ismember(PROJECT, {'no_PM_260506', 'no_PM_260512'})
+    elseif ismember(PROJECT, {'no_PM_260506', 'no_PM_260512', 'no_PM_260524'})
         CONTRASTS = {'str_fst', 'str_snd', 'switch'};
     else
         error("Error! Project not defined.")
