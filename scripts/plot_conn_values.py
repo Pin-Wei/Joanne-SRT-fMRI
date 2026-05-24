@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 
 import os
-import re
 import argparse
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
 
 class Config:
@@ -73,16 +71,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot ROI-to-ROI connectivity strength across runs by condition.",
         formatter_class=argparse.RawDescriptionHelpFormatter, 
-        epilog="If either source or target ROI index is not specified, the script will print the mapping of ROI indices to ROI names and exit."
+        epilog="If -i (--roi_index_pairs) is not omitted, the script will print the mapping of ROI indices to ROI names and exit."
     )
     parser.add_argument("-p", "--project", type=str, default="no_PM_260512", 
                         help="Name of the CONN project.")
-    parser.add_argument("-rp", "--roi_prefix", type=str, default=["networks", "joanne"][1], 
+    parser.add_argument("-r", "--roi_prefix", type=str, default=["networks", "joanne"][1], 
                         help="Prefix of the ROI names used to generate the report.")
-    parser.add_argument("-r1", "--source_roi", type=int, default=None, 
-                        help='Index of the source ROI.')
-    parser.add_argument("-r2", "--target_roi", type=int, default=None,
-                        help='Index of the target ROI.')
+    parser.add_argument("-i", "--roi_index_pairs", type=str, nargs="+", default=None, 
+                        help="One or more index pairs of the source and target ROIs. Format: 'source,target'. Example: -i 0,1 0,2 1,2")
     parser.add_argument("-s", "--seed", type=int, default=None, 
                         help="Random seed for plotting jitter.")
     parser.add_argument("-o", "--overwrite", action="store_true", 
@@ -104,8 +100,22 @@ def print_roi_dict(roi_dict: dict[int, str], roi_prefix: str):
     '''
     print(f"\nROI index for '{roi_prefix}':")
     print("\n".join([f"\t{idx:2d}:\t'{name}'" for idx, name in roi_dict.items()]))
-    print("\nPlease specify the source and target ROI indices using the -r1 (--source_roi) and -r2 (--target_roi) arguments.")
+    print("\nPlease specify the source and target ROI indices using the -i (--roi_index_pairs) arguments.")
     print()
+
+
+def parse_ridx_pairs(raw_pairs: list[str]) -> list[tuple[int, int]]:
+    '''
+    Parse a list of strings representing ROI index pairs into a list of tuples.
+    '''
+    int_pairs = []
+    for pair in raw_pairs:
+        try:
+            source, target = map(int, pair.split(","))
+            int_pairs.append((source, target))
+        except ValueError:
+            raise ValueError(f"Invalid ROI index pair format: '{pair}'. Expected format: 'source,target' with integers.")
+    return int_pairs
 
 
 def parse_condition(df: pd.DataFrame, config: Config) -> pd.DataFrame:
@@ -199,41 +209,24 @@ def setup_axes(ax: plt.Axes, ax_id: int, run_arr: np.ndarray, ctrl_data: CondDat
         ax.axhline(ctrl_data.mean, color=ctrl_data.color, ls="--", lw=config.ctrl_lw, zorder=3)
 
 
-def main():
-    args = parse_args()
-    config = Config(args)
-
-    assert os.path.exists(config.xls_file), f"Excel file not found: {config.xls_file}"
-
-    # If either source or target ROI is not specified, print the ROI index mapping and exit.
-    if (args.source_roi is None) or (args.target_roi is None):
-        mini_df = pd.read_excel(config.xls_file, usecols=["roi2"], nrows=10000)
-        mini_df = mini_df.sort_values(by="roi2").reset_index(drop=True)
-        roi_dict = make_roi_dict(mini_df)
-        print_roi_dict(roi_dict, args.roi_prefix)
-        return
-    
+def make_one_fig(df: pd.DataFrame, roi_dict: dict, ridx_pair: tuple, config: Config, overwrite: bool):
+    '''
+    Create and save a figure for the specified pair of source and target ROIs.
+    '''
     # Exit if the figure already exists and the overwrite flag is not enabled
-    fig_path = config.fig_path_template.format(source_roi=str(args.source_roi), target_roi=str(args.target_roi))
+    fig_path = config.fig_path_template.format(source_roi=str(ridx_pair[0]), target_roi=str(ridx_pair[1]))
     os.makedirs(os.path.dirname(fig_path), exist_ok=True)
-    if os.path.exists(fig_path) and (not args.overwrite):
-        print(f"Figure already exists and overwrite is not enabled. Exiting ...\n")
+    if os.path.exists(fig_path) and (not overwrite):
+        print(f"\nFigure '{fig_path}' already exists and overwrite is not enabled. Skipping ...")
         return
-    
-    # Load the entire DataFrame and remove duplicate rows
-    df = pd.read_excel(config.xls_file)
-    df = df.drop(columns=["contrast"])
-    df = df.drop_duplicates().reset_index(drop=True)
 
-    # Filter the DataFrame to include only rows corresponding to the specified source and target ROIs
-    df = df.sort_values(by="roi2").reset_index(drop=True)
-    roi_dict = make_roi_dict(df)
-    roi1 = roi_dict[args.source_roi]
-    roi2 = roi_dict[args.target_roi]
+    # Filter the DataFrame for the specified source and target ROIs
+    roi1 = roi_dict[ridx_pair[0]]
+    roi2 = roi_dict[ridx_pair[1]]
     targ_df = df.query(f"roi1 == '{roi1}' & roi2 == '{roi2}'")
     targ_df = targ_df.drop(columns=["roi1", "roi2"])
     fig_title = f"{roi1} x {roi2}"
-    print(f"Plotting connectivity values for '{roi1}' x '{roi2}' ...")
+    print(f"\nPlotting connectivity values for '{roi1}' x '{roi2}' ...")
     
     # Create 'run' column from the 'condition' column
     targ_df = parse_condition(targ_df, config)
@@ -247,22 +240,17 @@ def main():
     ctrl_cond = None if len(ctrl_cond) == 0 else ctrl_cond[0] if len(ctrl_cond) == 1 else ValueError(f"Multiple control conditions found: {ctrl_cond}")
     fig_cols = 2 if ctrl_cond else 1
 
-    # Plot and save the figure
-    plt.rcParams.update({
-        "axes.spines.top": False, 
-        "axes.spines.right": False, 
-        "figure.constrained_layout.use": True, 
-        "figure.figsize": config.fig_size, 
-        "figure.dpi": config.fig_dpi
-    })
+    # Create a figure
     fig_kwargs = {"width_ratios": config.fig_w_ratios} if fig_cols == 2 else {}
     fig, axes = plt.subplots(1, fig_cols, sharey=True, **fig_kwargs)
     
+    # Create CondData objects for each condition and plot them
     cond_datas = make_cond_datas(targ_df, config)
     for cond_name, data in cond_datas.items():
         ax = axes if fig_cols == 1 else axes[1] if cond_name == ctrl_cond else axes[0]
         plot_cond_data(ax, data, config)
     
+    # Add reference lines and finalize axes
     if ctrl_cond:
         for ax_id, ax in enumerate(axes):
             setup_axes(ax, ax_id, run_arr, cond_datas[ctrl_cond], config)
@@ -282,6 +270,48 @@ def main():
     plt.savefig(fig_path)
     plt.close(fig)
     print(f"\nFigure saved to: {fig_path}\n")
+
+
+def main():
+    args = parse_args()
+    config = Config(args)
+
+    assert os.path.exists(config.xls_file), f"Excel file not found: {config.xls_file}"
+
+    # If ROI index pairs are not specified, print the ROI index mapping and exit.
+    if args.roi_index_pairs is None:
+        mini_df = pd.read_excel(config.xls_file, usecols=["roi2"], nrows=10000)
+        mini_df = mini_df.sort_values(by="roi2").reset_index(drop=True)
+        roi_dict = make_roi_dict(mini_df)
+        print_roi_dict(roi_dict, args.roi_prefix)
+        return
+    
+    # Load the entire DataFrame and remove duplicate rows
+    df = pd.read_excel(config.xls_file)
+    df = df.drop(columns=["contrast"])
+    df = df.drop_duplicates().reset_index(drop=True)
+
+    # Filter the DataFrame to include only rows corresponding to the specified source and target ROIs
+    df = df.sort_values(by="roi2").reset_index(drop=True)
+    roi_dict = make_roi_dict(df)
+
+    # Set up plotting parameters at runtime
+    plt.rcParams.update({
+        "axes.spines.top": False, 
+        "axes.spines.right": False, 
+        "figure.constrained_layout.use": True, 
+        "figure.figsize": config.fig_size, 
+        "figure.dpi": config.fig_dpi
+    })
+
+    # Parse the specified ROI index pairs and create a figure for each pair
+    ridx_pairs = parse_ridx_pairs(args.roi_index_pairs)
+    print(f"\nParsed {len(ridx_pairs)} ROI index pair(s) to plot.")
+
+    for ridx_pair in ridx_pairs:
+        make_one_fig(df, roi_dict, ridx_pair, config, args.overwrite)
+
+    print("\nAll done!\n")
 
 
 if __name__ == '__main__':
