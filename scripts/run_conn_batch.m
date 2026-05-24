@@ -425,12 +425,12 @@ function [onsets, durations] = cond_setter(condName, irun, subj, bidsDir)
         return; 
     end
 
-    if startsWith(condName, 'str_')
-        fileTag = 'structured';
-    elseif startsWith(condName, 'str_fst')
+    if startsWith(condName, 'str_fst')
         fileTag = 'str_fst';
     elseif startsWith(condName, 'str_snd')
         fileTag = 'str_snd';
+    elseif startsWith(condName, 'str_')
+        fileTag = 'structured';
     elseif startsWith(condName, 'swi_')
         fileTag = 'switch';
     else
