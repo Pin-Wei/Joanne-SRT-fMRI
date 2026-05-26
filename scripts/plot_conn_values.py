@@ -30,7 +30,8 @@ class Config:
         }
         self.fig_dpi = 200
         self.fig_size = (10, 8)
-        self.legend_pos = (0.5, -0.07)
+        self.legend_loc = "lower center" # "upper center"
+        self.legend_pos = (0.5, 1) # (0.5, -0.07)
         self.fig_w_ratios = [6, 1]
         self.title_fs = 18
         self.label_fs = 16
@@ -48,7 +49,8 @@ class Config:
     def setup_paths(self, args):
         self.source_dir = os.path.dirname(os.path.abspath(__file__))
         self.xls_file = os.path.join(self.source_dir, "..", "conn_out", "values", args.project, f"ROI_{args.roi_prefix}.xlsx")
-        self.fig_path_template = os.path.join(self.source_dir, "..", "figures", "Connectivity", args.project, f"ROI_{args.roi_prefix}_{{source_roi}}_{{target_roi}}.png")
+        self.fig_path_template_1 = os.path.join(self.source_dir, "..", "figures", "Connectivity", args.project, f"ROI_{args.roi_prefix}_{{ridx1}}_{{ridx2}}.png")
+        self.fig_path_template_2 = os.path.join(self.source_dir, "..", "figures", "Connectivity", args.project, "mean_only", f"ROI_{args.roi_prefix}_{{ridx1}}_{{ridx2}}.png")
     
 
 @dataclass
@@ -73,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter, 
         epilog="If -i (--roi_index_pairs) is not omitted, the script will print the mapping of ROI indices to ROI names and exit."
     )
-    parser.add_argument("-p", "--project", type=str, default="no_PM_260512", 
+    parser.add_argument("-p", "--project", type=str, required=True, 
                         help="Name of the CONN project.")
     parser.add_argument("-r", "--roi_prefix", type=str, default=["networks", "joanne"][1], 
                         help="Prefix of the ROI names used to generate the report.")
@@ -151,24 +153,25 @@ def make_cond_datas(df: pd.DataFrame, config: Config) -> dict[str, CondData]:
     return cond_datas
 
 
-def plot_cond_data(ax: plt.Axes, cond_data: CondData, config: Config):
+def plot_cond_data(ax: plt.Axes, cond_data: CondData, config: Config, plot_scatter: bool):
     '''
     Plot the connectivity values for a single condition on the given Axes.
     '''
     # Plot individual data points with jitter
-    for run in cond_data.runs:
-        y_arr = cond_data.values[:, cond_data.runs == run].flatten()
-        rng = np.random.default_rng(seed=config.seed + run)
-        x_jitter = rng.normal(0, config.jitter_sd, size=y_arr.size)
-        ax.scatter(
-            x=np.full_like(y_arr, fill_value=run) + x_jitter, 
-            y=y_arr, 
-            s=config.small_dot_size, 
-            c=cond_data.color, 
-            edgecolors="none", 
-            alpha=config.small_dot_alpha, 
-            zorder=1
-        )
+    if plot_scatter:
+        for run in cond_data.runs:
+            y_arr = cond_data.values[:, cond_data.runs == run].flatten()
+            rng = np.random.default_rng(seed=config.seed + run)
+            x_jitter = rng.normal(0, config.jitter_sd, size=y_arr.size)
+            ax.scatter(
+                x=np.full_like(y_arr, fill_value=run) + x_jitter, 
+                y=y_arr, 
+                s=config.small_dot_size, 
+                c=cond_data.color, 
+                edgecolors="none", 
+                alpha=config.small_dot_alpha, 
+                zorder=1
+            )
     
     # Plot mean and SE
     ax.errorbar(
@@ -197,10 +200,10 @@ def setup_axes(ax: plt.Axes, ax_id: int, run_arr: np.ndarray, ctrl_data: CondDat
         ax.tick_params(axis="both", labelsize=config.ticks_fs)
 
     else: # for right panel
-        ax.set_xlabel(ctrl_data.name, fontsize=config.label_fs)
+        ax.set_xlabel(f"\n{ctrl_data.name}", fontsize=config.label_fs)
         ax.set_xlim(config.na_filler - 0.5, config.na_filler + 0.5)
         ax.set_xticks([])
-        ax.tick_params(axis="y", which="both", labelleft=False)
+        ax.tick_params(axis="y", which="both", left=False, labelleft=False)
         ax.spines["left"].set_visible(False)
 
     # For both panels
@@ -209,46 +212,18 @@ def setup_axes(ax: plt.Axes, ax_id: int, run_arr: np.ndarray, ctrl_data: CondDat
         ax.axhline(ctrl_data.mean, color=ctrl_data.color, ls="--", lw=config.ctrl_lw, zorder=3)
 
 
-def make_one_fig(df: pd.DataFrame, roi_dict: dict, ridx_pair: tuple, config: Config, overwrite: bool):
+def plot_one_fig(cond_datas: dict[str, CondData], ctrl_cond: str, run_arr: np.ndarray, plot_scatter: bool, fig_title: str, fig_path: str, config: Config):
     '''
-    Create and save a figure for the specified pair of source and target ROIs.
+    Create and save a figure comparing connectivity values across conditions, 
+    with an optional control condition in a separate panel.
     '''
-    # Exit if the figure already exists and the overwrite flag is not enabled
-    fig_path = config.fig_path_template.format(source_roi=str(ridx_pair[0]), target_roi=str(ridx_pair[1]))
-    os.makedirs(os.path.dirname(fig_path), exist_ok=True)
-    if os.path.exists(fig_path) and (not overwrite):
-        print(f"\nFigure '{fig_path}' already exists and overwrite is not enabled. Skipping ...")
-        return
-
-    # Filter the DataFrame for the specified source and target ROIs
-    roi1 = roi_dict[ridx_pair[0]]
-    roi2 = roi_dict[ridx_pair[1]]
-    targ_df = df.query(f"roi1 == '{roi1}' & roi2 == '{roi2}'")
-    targ_df = targ_df.drop(columns=["roi1", "roi2"])
-    fig_title = f"{roi1} x {roi2}"
-    print(f"\nPlotting connectivity values for '{roi1}' x '{roi2}' ...")
-    
-    # Create 'run' column from the 'condition' column
-    targ_df = parse_condition(targ_df, config)
-    run_arr = sorted(targ_df["run"].dropna().unique())
-    if config.na_filler in run_arr:
-        idx = run_arr.index(config.na_filler)
-        run_arr = np.delete(run_arr, idx)
-
-    # Identify the control condition (if any)
-    ctrl_cond = targ_df.query(f"run == {config.na_filler}")["cond"].unique()
-    ctrl_cond = None if len(ctrl_cond) == 0 else ctrl_cond[0] if len(ctrl_cond) == 1 else ValueError(f"Multiple control conditions found: {ctrl_cond}")
     fig_cols = 2 if ctrl_cond else 1
-
-    # Create a figure
     fig_kwargs = {"width_ratios": config.fig_w_ratios} if fig_cols == 2 else {}
     fig, axes = plt.subplots(1, fig_cols, sharey=True, **fig_kwargs)
-    
-    # Create CondData objects for each condition and plot them
-    cond_datas = make_cond_datas(targ_df, config)
+
     for cond_name, data in cond_datas.items():
         ax = axes if fig_cols == 1 else axes[1] if cond_name == ctrl_cond else axes[0]
-        plot_cond_data(ax, data, config)
+        plot_cond_data(ax, data, config, plot_scatter=plot_scatter)
     
     # Add reference lines and finalize axes
     if ctrl_cond:
@@ -260,16 +235,57 @@ def make_one_fig(df: pd.DataFrame, roi_dict: dict, ridx_pair: tuple, config: Con
         ax = axes
     
     ax.legend(
-        loc="upper center", 
+        loc=config.legend_loc, 
         bbox_to_anchor=config.legend_pos, # pin loc corner to the specific coordinate (x, y)
         ncol=len(cond_datas),
         fontsize=config.label_fs, 
         frameon=False
     )
-    plt.suptitle(fig_title, fontsize=config.title_fs)
+    plt.suptitle(fig_title, fontsize=config.title_fs, fontweight="bold")
     plt.savefig(fig_path)
     plt.close(fig)
-    print(f"\nFigure saved to: {fig_path}\n")
+    print(f"Figure saved to: {fig_path}")
+
+
+def run_one_iter(df: pd.DataFrame, roi_dict: dict, ridx_pair: tuple, config: Config, overwrite: bool):
+    '''
+    Create and save a figure for the specified pair of source and target ROIs.
+    '''
+    # Exit if the figure already exists and the overwrite flag is not enabled
+    fig_path_1 = config.fig_path_template_1.format(ridx1=str(ridx_pair[0]), ridx2=str(ridx_pair[1]))
+    fig_path_2 = config.fig_path_template_2.format(ridx1=str(ridx_pair[0]), ridx2=str(ridx_pair[1]))
+
+    for fp in [fig_path_1, fig_path_2]:
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        if os.path.exists(fp) and (not overwrite):
+            print(f"\nFigure '{fp}' already exists and overwrite is not enabled. Skipping current iteration ...")
+            return
+
+    # Filter the DataFrame for the specified source and target ROIs
+    roi1 = roi_dict[ridx_pair[0]]
+    roi2 = roi_dict[ridx_pair[1]]
+    targ_df = df.query(f"roi1 == '{roi1}' & roi2 == '{roi2}'")
+    targ_df = targ_df.drop(columns=["roi1", "roi2"])
+    fig_title = f"{roi1} x {roi2}"
+    print(f"\nPlotting connectivity values for '{fig_title}' ...")
+    
+    # Create 'run' column from the 'condition' column
+    targ_df = parse_condition(targ_df, config)
+    run_arr = sorted(targ_df["run"].dropna().unique())
+    if config.na_filler in run_arr:
+        idx = run_arr.index(config.na_filler)
+        run_arr = np.delete(run_arr, idx)
+
+    # Create CondData objects for each condition
+    cond_datas = make_cond_datas(targ_df, config)
+
+    # Identify the control condition (if any)
+    ctrl_cond = targ_df.query(f"run == {config.na_filler}")["cond"].unique()
+    ctrl_cond = None if len(ctrl_cond) == 0 else ctrl_cond[0] if len(ctrl_cond) == 1 else ValueError(f"Multiple control conditions found: {ctrl_cond}")
+
+    # Create and save the figures
+    for fp, plot_scatter in zip([fig_path_1, fig_path_2], [True, False]):
+        plot_one_fig(cond_datas, ctrl_cond, run_arr, plot_scatter, fig_title, fp, config)
 
 
 def main():
@@ -287,6 +303,7 @@ def main():
         return
     
     # Load the entire DataFrame and remove duplicate rows
+    print(f"\nLoading data from: '{config.xls_file}' ...")
     df = pd.read_excel(config.xls_file)
     df = df.drop(columns=["contrast"])
     df = df.drop_duplicates().reset_index(drop=True)
@@ -309,7 +326,7 @@ def main():
     print(f"\nParsed {len(ridx_pairs)} ROI index pair(s) to plot.")
 
     for ridx_pair in ridx_pairs:
-        make_one_fig(df, roi_dict, ridx_pair, config, args.overwrite)
+        run_one_iter(df, roi_dict, ridx_pair, config, args.overwrite)
 
     print("\nAll done!\n")
 
