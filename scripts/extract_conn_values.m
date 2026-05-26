@@ -94,6 +94,7 @@ function extract_conn_values(varargin)
 
     writetable(T, outFile);
     fprintf('\r\nFile saved at: %s', outFile);
+    fprintf('\r\n');
 end
 
 %% Other functions

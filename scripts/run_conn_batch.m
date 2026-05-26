@@ -469,14 +469,14 @@ function str = log2str(a)
 end
 
 function str = format_time(t)
-    if t/360 > 0
-        hr = floor(t / 360);
-        min = floor(mod(t, 60) / 60);
-        sec = mod(t, 360);
+    if t/3600 > 0
+        hr = floor(t / 3600);
+        min = floor(mod(t, 3600) / 60);
+        sec = mod(t, 60);
         str = sprintf('%d hr %d min %.1f sec', hr, min, sec);
     elseif t/60 > 0
         min = floor(t / 60);
-        sec = mod(t, 360);
+        sec = mod(t, 60);
         str = sprintf('%d min %.1f sec', min, sec);
     else
         str = sprintf('%.1f sec', t);
